@@ -24,10 +24,10 @@ endif
 # Development
 
 tests:
-	pytest -q tests/
+	pytest -q
 
 format:
-	black ocp_viewer_core tests
+	black .
 
 # Distribution
 

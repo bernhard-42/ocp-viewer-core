@@ -41,9 +41,6 @@ dev = ["bump-my-version", "black", "pytest", "twine"]
 where = ["."]
 include = ["ocp_viewer_core*"]
 
-[tool.setuptools.package-data]
-ocp_viewer_core = ["config_keys.toml"]
-
 # black settings
 
 [tool.black]

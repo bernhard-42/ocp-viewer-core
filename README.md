@@ -24,7 +24,8 @@ Early development. Nothing here is published, and the API changes without notice
 | path | what |
 | ---- | ---- |
 | `ocp_viewer_core/` | the Python half |
-| `ocp_viewer_core/config_keys.toml` | the config key table — one row per option, the source both languages generate from |
+| `ocp_viewer_core/config.py` | the config keys, each mapped to the name three-cad-viewer knows it by, and the precedence over them |
+| `ocp_viewer_core/comms.py` | the transport a host implements, and the session that caches what it answers |
 | `js/` | the JavaScript half, published to npm |
 | `tests/` | including the conformance kit |
 
