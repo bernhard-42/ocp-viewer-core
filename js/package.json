@@ -1,0 +1,22 @@
+{
+  "name": "ocp-viewer-core",
+  "version": "0.1.0",
+  "description": "Shared viewer policy for ocp_vscode, ocp_viewer, Jupyter CadQuery and build123d Studio",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "three-cad-viewer": ">=5.0.3 <5.1.0"
+  },
+  "license": "Apache-2.0",
+  "author": "Bernhard Walter <b_walter@arcor.de>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bernhard-42/ocp-viewer-core.git"
+  }
+}

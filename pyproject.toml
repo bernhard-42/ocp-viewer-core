@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ocp-viewer-core"
+version = "0.1.0"
+authors = [{ name = "Bernhard Walter", email = "b_walter@arcor.de" }]
+description = "Shared viewer core for ocp_vscode, ocp_viewer, Jupyter CadQuery and build123d Studio"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = [
+    "3d models",
+    "3d viewing",
+    "3d",
+    "brep",
+    "cad",
+    "cadquery",
+    "opencascade",
+    "python",
+]
+license = "Apache-2.0"
+classifiers = [
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+
+# No OCP provider is declared, deliberately: the same OCP namespace is shipped
+# by cadquery_ocp, cadquery_ocp_novtk and conda's OCP, and naming one would
+# break the users of the other two. The host or the user chooses.
+dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson"]
+
+[project.optional-dependencies]
+dev = ["bump-my-version", "black", "pytest", "twine"]
+
+[project.urls]
+"Homepage" = "https://github.com/bernhard-42/ocp-viewer-core"
+"Bug Tracker" = "https://github.com/bernhard-42/ocp-viewer-core/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ocp_viewer_core*"]
+
+[tool.setuptools.package-data]
+ocp_viewer_core = ["config_keys.toml"]
+
+# black settings
+
+[tool.black]
+target-version = ["py310", "py311", "py312", "py313"]
+line-length = 88
+
+# bump-my-version settings
+
+[tool.bumpversion]
+current_version = "0.1.0"
+commit = false
+tag = false
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)(?P<release>\\d*)(?P<build>\\d*)"
+serialize = ["{major}.{minor}.{patch}"]
+allow_dirty = true
+message = "Bump version: {current_version} → {new_version}"
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+ignore_missing_files = false
+sign_tags = false
+commit_args = ""
+setup_hooks = []
+pre_commit_hooks = []
+post_commit_hooks = []
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "ocp_viewer_core/_version.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "js/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
