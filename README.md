@@ -21,15 +21,62 @@ Early development. Nothing here is published, and the API changes without notice
 
 ## Layout
 
-| path | what |
-| ---- | ---- |
-| `ocp_viewer_core/` | the Python half |
+| path                        | what                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `ocp_viewer_core/`          | the Python half                                                                                     |
 | `ocp_viewer_core/config.py` | the config keys, each mapped to the name three-cad-viewer knows it by, and the precedence over them |
-| `ocp_viewer_core/comms.py` | the transport a host implements, and the session that caches what it answers |
-| `js/` | the JavaScript half, published to npm |
-| `tests/` | including the conformance kit |
+| `ocp_viewer_core/comms.py`  | the transport a host implements, and the session that caches what it answers                        |
+| `js/`                       | the JavaScript half, published to npm                                                               |
+| `tests/`                    | including the conformance kit                                                                       |
 
 `ocp_viewer_core/__init__.py` is import-free by design: hosts import the submodule they need, so that importing the package never pulls in the tessellator or OCP.
+
+## Use
+
+### ocp vscode:
+
+Every client knows its workspace config keys:
+
+```python
+workspace_config_keys = (
+    "center_grid",
+    "collapse",
+    "dark",
+    "glass",
+    "grid_font_size",
+    "orbit_control",
+    "states",
+    "ticks",
+    "tools",
+    "tree_width",
+    "up",
+    "pan_speed",
+    "rotate_speed",
+    "zoom_speed",
+    "ambient_intensity",
+    "angular_tolerance",
+    "default_color",
+    "default_edgecolor",
+    "default_facecolor",
+    "default_opacity",
+    "default_thickedgecolor",
+    "default_vertexcolor",
+    "deviation",
+    "direct_intensity",
+    "metalness",
+    "modifier_keys",
+    "roughness",
+)
+```
+
+For every `show` statement use this block:
+
+```python
+comms = Comms(...)
+session = Session(comms) # sets session cache to None
+config = Config(session, workspace_config_keys, ("cad_width", "height"))
+show(objects)
+```
 
 ## Dependencies
 
