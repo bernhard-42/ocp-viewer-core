@@ -1,18 +1,29 @@
 /**
  * Assembling the three option objects `Viewer.render` and `new Display` take.
  *
- * `viewer.html` built these inline in `render()` and `getDisplayOptions()`;
- * cad-viewer-widget builds them in `getDisplayOptions`, `getRenderOptions` and
- * `getViewerOptions`. Same three objects, three copies of the key lists.
- *
  * Which option belongs to which object is three-cad-viewer's fact rather than
- * Python's, so the lists live here in renderer names. What used to sit beside
- * them - `toCamelCase` and its override table - does not: the config arrives
- * already in renderer names, because Python converts once at the boundary. A
- * key that is still snake_case here is a host that has not converted, and it
- * will miss its entry and fall back to a default rather than be silently
- * renamed into something plausible.
+ * Python's, so the lists live here in renderer names. The config arrives in
+ * those names, Python having converted once at the boundary; no name is
+ * translated here. A key still in snake_case is a host that has not converted,
+ * and it will miss its entry and fall back to a default rather than be renamed
+ * into something plausible.
  */
+
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 // The defaults themselves, not only the key lists. They describe
 // three-cad-viewer, so every client should start from the same numbers and

@@ -11,6 +11,22 @@
  * of the wire speaks. Python converts once, at the boundary, on its way out.
  */
 
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 export { applyConfig, isApplicable, GEOMETRY_KEYS, VIEWS } from "./apply.js";
 
 export {
@@ -29,9 +45,8 @@ export {
 // client has to agree on, and the one that was hardest to get right.
 export { createRenderer } from "./render.js";
 
-// The page itself: the viewer, the message handling and the resizing that
-// every host's HTML used to hold a copy of. The one module here that touches
-// the DOM, because it is the page.
+// The page itself: the viewer, the message handling and the resizing. The one
+// module here that touches the DOM, because it is the page.
 export { createPage } from "./page.js";
 
 export {

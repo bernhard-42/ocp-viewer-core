@@ -1,15 +1,30 @@
 /**
  * Tree visibility state across a re-`show()`.
  *
- * When a model is shown again, the user's visibility choices should survive for
- * the objects that are still there. `viewer.html` does this inline in its
- * message handler; without it every `show()` resets the tree, which is what
- * build123d Studio does today because it never had this logic at all.
+ * When a model is shown again, the user's visibility choices should survive
+ * for the objects that are still there. Without this, every `show()` resets the
+ * tree.
  *
  * The two halves are pure and take no viewer: what the new model contains, and
  * which of the old choices are worth re-applying. Only the orchestrator at the
  * bottom touches a viewer.
  */
+
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 /**
  * The visibility state of every leaf in a tessellated model, keyed by id.

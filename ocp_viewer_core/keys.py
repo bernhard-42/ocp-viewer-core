@@ -1,11 +1,27 @@
-"""The config key vocabulary, and the one place the two languages meet.
+"""The config key vocabulary: one name in Python, one in JavaScript.
 
-Its own module because both halves need it and neither may import the other:
-`config.py` reads it to group and validate keys, and `comms.py` reads it to
-translate a payload on its way to the viewer. It is also the right home on its
-own merits - the renderer names describe three-cad-viewer, not a host's
-configuration, and they do not change when a host does.
+A module of its own because both halves of the package need it and neither may
+import the other - `config` groups and validates keys with it, `comms`
+translates a payload with it. The renderer names describe three-cad-viewer
+rather than any host, so they belong with neither.
 """
+
+#
+# Copyright 2026 Bernhard Walter
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 
 
 def _snake_to_camel(name):
@@ -20,8 +36,8 @@ def merge(*mappings):
     A key belonging to more than one group is ordinary - UI_MATERIAL is both a
     ui group and a renderer group - and is not a conflict as long as every group
     names the same renderer option. Two groups disagreeing is a bug, and taking
-    the last one silently is what concatenating tuples used to do: the old
-    workspace list carried four keys twice for exactly that reason.
+    the last silently is what concatenating tuples does, and it hides a
+    disagreement rather than reporting one.
     """
     merged = {}
     for mapping in mappings:
@@ -179,11 +195,8 @@ SETTABLE = merge(
     UI_CLIP,
     UI_ZEBRA,
     # The studio family is settable because the shared dispatch applies
-    # it. viewer.html's own switch never had these eleven branches, so
-    # under ocp_vscode 4.x sending one posted a message the browser
-    # dropped in silence; cad-viewer-widget has always had them as a
-    # setter table. They belong here from the moment viewer.html calls
-    # into the shared apply, and not before.
+    # it. A host whose page does not call into the shared dispatch cannot
+    # act on them, and would drop such a message without a word.
     UI_STUDIO,
     MOUSE,
     CAMERA,

@@ -9,12 +9,9 @@ Not every host wants it: build123d Studio sends length-prefixed binary frames
 over a local socket, and implements `Comms` directly. That is why `Comms` is
 an interface and this is one implementation of it.
 
-The port is instance state, not a module global. It used to be three globals -
-CMD_PORT, CMD_URL and INIT_DONE - which is the same defect the Viewer class
-closed on the show side: two clients in one process shared one port, and the
-second to be configured won. Hosts keep their `set_port()` and `get_port()`
-functions as wrappers over their own instance, so nothing a user wrote has to
-change.
+The port is instance state rather than a module global, so that two clients in
+one process address two viewers. Hosts expose `set_port()` and `get_port()` as
+wrappers over their own instance.
 """
 
 #

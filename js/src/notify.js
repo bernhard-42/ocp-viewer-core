@@ -13,14 +13,28 @@
  * choice rather than by ours.
  */
 
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 /**
  * Keys that report that something happened, as opposed to what something is.
  *
  * These must never be accumulated into a status snapshot. An accumulated
  * `selectedShapeIDs` replays a selection the user made minutes ago into the
- * next measurement, against a model that may not even contain those ids -
- * build123d Studio hit exactly that and fixed it by sending the delta, and
- * ocp_vscode's standalone still accumulates today.
+ * next measurement, against a model that may not even contain those ids.
  *
  * The distinction is not "does it change often". It is whether re-applying the
  * last value to a different model still means anything.

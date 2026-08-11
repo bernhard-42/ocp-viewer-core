@@ -272,10 +272,10 @@ def _apply_mode_to_node(node, state_faces, state_edges):
 def _apply_mode(part_group, mode_list):
     """Apply per-object mode settings to the top-level entries of part_group.
 
-    Nothing calls this, in the golden master or here: `_show` turns each mode
-    into its `_MODE_STATES` pair and hands the pairs to `to_ocpgroup`, which
-    applies them while building the tree. Carried over unchanged rather than
-    dropped, because a migration is not the place to decide it is dead.
+    Currently unreachable: `_show` turns each mode into its `_MODE_STATES` pair
+    and hands the pairs to `to_ocpgroup`, which applies them while building the
+    tree. Kept because per-object modes are part of this module's contract and
+    a caller may want to apply them to an already-built group.
     """
     for i, mode in enumerate(mode_list):
         if mode is None or i >= len(part_group.objects):
@@ -381,16 +381,13 @@ def none_filter(d, excludes=None):
 def _take_color_default(kwargs, conf, key):
     """The value for one of ocp_tessellate's three "shown on its own" colors.
 
-    Precedence is the golden master's: an explicit keyword to `show` wins over
-    the workspace config. The keyword is *removed* from kwargs when it is used -
-    also the golden master's behaviour, and load-bearing, because whatever stays
-    in kwargs is later copied into the params dict that goes to the renderer.
-    (A workspace-config value does reach the renderer, an explicit one does not.
-    That asymmetry is preserved rather than fixed; see the report.)
+    An explicit keyword to `show` wins over the workspace config, and is
+    *removed* from kwargs when used. That removal matters: whatever stays in
+    kwargs is later copied into the params the renderer receives, so a value
+    taken from the workspace config reaches it and an explicit one does not.
 
-    Returning None when neither says anything is deliberate: ocp_tessellate then
-    applies its own precedence - `set_defaults`, then its module constant - which
-    the golden master short-circuited by reading the constant itself.
+    Returning None when neither source says anything leaves ocp_tessellate to
+    apply its own precedence - `set_defaults`, then its module constant.
     """
     if kwargs.get(key) is not None:
         value = kwargs[key]
@@ -424,17 +421,16 @@ class Viewer(Generic[H]):
     """
 
     def __init__(self, config: Config):
-        # The session cache lasts exactly one show, which is what makes it safe:
-        # `_splash` is true only while the logo is up, so answers held across
-        # shows would keep forcing a camera reset and discard every explicit
-        # `reset_camera=`. `_show` clears the session in a finally, and it is the
-        # single choke point every model send routes through.
+        # The session cache lasts exactly one show, which is what makes it
+        # safe: `_splash` is true only while the logo is up, so an answer held
+        # across shows would force a camera reset and discard every explicit
+        # `reset_camera=`. `_show` clears it in a finally, and is the single
+        # choke point every model send routes through.
         self.config = config
         # Annotated rather than inferred: `Session.comms` is a bare `Comms`, so
-        # without this the handle type would be lost on the way in and every
-        # `show` would return Unknown. Making Session and Config generic too
-        # would carry it automatically - a change to two already-migrated
-        # modules, deliberately not made here.
+        # the handle type would otherwise be lost here and every `show` would
+        # return Unknown. Making `Session` and `Config` generic in `H` would
+        # carry it automatically.
         self.comms: Comms[H] = config.session.comms
 
         # The stack `show_object` and `push_object` accumulate into.
@@ -524,14 +520,12 @@ class Viewer(Generic[H]):
         collapse = conf.get("collapse", Collapse.ROOT)
         conf["collapse"] = collapse.value
 
-        # ocp_tessellate 3.5.0 turned FACE_COLOR, THICK_EDGE_COLOR and
-        # VERTEX_COLOR into `default_facecolor`, `default_thickedgecolor` and
-        # `default_vertexcolor` on `to_ocp` / `to_ocpgroup` / `to_assembly`. The
-        # golden master assigned those three module globals instead - another
-        # package's state, rewritten on every show - so two Viewers in one
-        # process fought over each other's colors. Parameter names verified
-        # against ocp-tessellate/ocp_tessellate/convert.py:1742-1805, not taken
-        # on trust.
+        # Passed as parameters rather than by assigning ocp_tessellate's
+        # FACE_COLOR, THICK_EDGE_COLOR and VERTEX_COLOR module globals: those
+        # are another package's state and rewriting them on every show lets two
+        # Viewers in one process overwrite each other's colours. Requires
+        # ocp_tessellate 3.5.0, which added these to `to_ocp`, `to_ocpgroup` and
+        # `to_assembly`.
         default_facecolor = _take_color_default(kwargs, conf, "default_facecolor")
         default_thickedgecolor = _take_color_default(
             kwargs, conf, "default_thickedgecolor"
@@ -607,11 +601,9 @@ class Viewer(Generic[H]):
 
         extracted_materials = _extract_material_objects(part_group)
 
-        # `exclude_keys` is the host's answer to "which config keys does the
-        # host own rather than the user". The golden master branched on which
-        # host it was in and hard-coded cad_width, height and theme; the host
-        # now says so itself, which is the same decision relocated rather than
-        # dissolved - a panel owns its own geometry, a notebook cell does not.
+        # The keys this host owns rather than the user: a panel decides its own
+        # geometry, where a notebook cell is told one. The host supplies the
+        # list, so nothing here needs to know which host it is running in.
         exclude_keys = self.config.exclude_keys
         params = {
             k: v
@@ -1176,10 +1168,9 @@ class Viewer(Generic[H]):
 
         if is_pytest():
             # The one place the `H | None` annotation is not the truth: under
-            # pytest `_convert` returns the tessellation instead of a wire
-            # message and nothing is sent, so there is no handle to hand back.
-            # Preserved from the golden master rather than typed honestly,
-            # because the tests read that tuple.
+            # the test stub `_convert` returns the tessellation rather than a
+            # wire message and nothing is sent, so there is no handle. The tests
+            # read that tuple, which is why the signature is not narrowed.
             return (
                 t,
                 mapping,
@@ -1188,13 +1179,11 @@ class Viewer(Generic[H]):
         with Timer(timeit, "", "send"):
             handle = self.config.session.send_data(t, timeit=timeit)
 
-        # The golden master branched here: one host sent the model to the
-        # measurement backend keyed by the widget it had just been handed and
-        # returned that widget, the other sent it keyed by a port and returned
-        # None. `send_data` returning the host's handle is what dissolves the
-        # branch - a host that needs the handle to address its backend keeps it
-        # from the call above, inside its own Comms, where knowing about widgets
-        # is legitimate.
+        # `send_data` returning the host's handle is what lets this be one
+        # line for every host. One addresses its measurement backend by the
+        # widget it was just handed and another by a port; both keep whatever
+        # they need inside their own Comms, where knowing about widgets or
+        # ports is legitimate.
         self.comms.send_backend({"model": mapping}, timeit=timeit)
         return handle
 
@@ -1899,11 +1888,10 @@ class Viewer(Generic[H]):
                     and obj.__class__.__module__ == "__future__"
                 )
                 or isinstance(obj, Logger)
-                # A viewer must not be asked to draw itself. The golden master
-                # tested for a host's module name inside str(obj.__class__);
-                # the transport is the one object that can answer this without
-                # anybody being named, and answers False when a host has no
-                # handle to confuse.
+                # A viewer must not be asked to draw itself, and in a notebook
+                # the namespace being walked contains the widget. The transport
+                # is the one object that can recognise its own handle, and
+                # answers False for a host that has none.
                 or self.comms.is_handle(obj)
             ):
                 continue
@@ -1979,12 +1967,8 @@ class Viewer(Generic[H]):
                     _force_in_debug=_visual_debug,
                     **kwargs,
                 )
-                # The golden master returned here only under pytest or in the
-                # one host whose show hands back a widget, and fell through to
-                # None otherwise. Since `show` now returns whatever the
-                # transport returned - None for a host with no handle - the
-                # branch and the unconditional return are the same three
-                # behaviours, and there is nothing left to branch on.
+                # Whatever the transport returned: a widget for a host that
+                # has one, None for a host that does not.
                 return result
             except Exception as ex:  # pylint: disable=broad-exception-caught  # noqa: BLE001
                 print("show_all:", ex)
@@ -2000,8 +1984,6 @@ class Viewer(Generic[H]):
 
         `port` is a host keyword like any other: it is handed to the transport
         for the length of this call and means whatever that host makes of it.
-        Before the scope existed it was accepted here and threaded nowhere, so a
-        screenshot asked of a second viewer was taken of the first.
         """
         if not filename.startswith(os.sep):
             prefix = pathlib.Path(".").absolute()

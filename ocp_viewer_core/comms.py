@@ -1,3 +1,27 @@
+"""The transport a host implements, and the session over it.
+
+`Comms` is the whole of what a host must provide: five ways to send, one to
+listen, and a test for its own viewer handle. `Session` is the shared half -
+it caches the two reads a show makes and scopes both those answers and the
+call's keywords to one call.
+"""
+
+#
+# Copyright 2026 Bernhard Walter
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import enum
 import os
 from typing import Any, Generic, TypeVar
@@ -38,18 +62,17 @@ class Comms(Generic[H]):
     """
 
     def __init__(self):
-        # The keywords of the call in flight. A host reads what it owns out of
-        # this - `port` for ocp_vscode and the standalone, `title`/`viewer` for
-        # Jupyter CadQuery - inside its own send methods, where knowing what
-        # those mean is legitimate.
+        # The keywords of the call in flight. A host reads the ones it owns
+        # out of this inside its own send methods - `port` for the hosts that
+        # address a viewer by one, `title` for those that name a sidecar.
         self.keywords: dict = {}
 
-    # Each raises rather than returning None. A body of just a docstring types
-    # as returning None, which is both a lie - send_data promises a handle - and
-    # infectious: Session.workspace_config() would return None, get_defaults()
-    # would call dict(None), and everything downstream of that inherits a
-    # nonsense type. It is also the honest runtime behaviour: a host that
-    # forgets one of these should fail loudly, not send nothing and return None.
+    # Each raises rather than having a docstring for a body. A body of only a
+    # docstring types as returning None, which contradicts `send_data`'s promise
+    # of a handle and spreads: `Session.workspace_config()` would be typed None,
+    # `get_defaults()` would call `dict(None)`. It is also the right runtime
+    # behaviour - a host that omits one should fail rather than silently send
+    # nothing.
 
     def send_data(self, data: Any, timeit: bool = False) -> H:
         """Send a model to the viewer, and return the host's handle for it."""
@@ -169,20 +192,17 @@ class Session(Generic[H]):
     def clear(self) -> None:
         """Forget this show's cached reads.
 
-        Called at the end of every show, so the next one asks again. The cache
-        exists to stop one show opening the same connection six times; it must
-        not survive into the next show, because the answers change between them
-        - `_splash` is true only while the logo is up, and a cache that outlived
-        the show would keep forcing a camera reset and quietly discard every
-        explicit `reset_camera=`.
+        Called at the end of every show. The cache exists to stop one show
+        opening the same connection six times, and must not outlive it: the
+        answers change between shows. `_splash` is the case that proves it - it
+        is true only while the logo is on screen, and an answer held past that
+        forces a camera reset and discards every explicit `reset_camera=`.
 
-        Clearing rather than rebuilding the Session matters now that a host
-        binds `show = viewer.show` once: the objects stay put for the life of
-        the Viewer and only the answers are short-lived.
+        A host binds `show = viewer.show` once, so the Session lives as long as
+        the Viewer; only its answers are short-lived, and clearing them is what
+        makes that safe.
 
-        The call's keywords end here too. They are scoped to the same call as
-        the answers, so one method closes both rather than a host having to
-        remember two.
+        The call's keywords end here too, having the same lifetime.
         """
         self._status = None
         self._workspace_config = None
@@ -222,13 +242,10 @@ class Session(Generic[H]):
 def is_pytest():
     """Whether to answer from canned data instead of asking a viewer.
 
-    Opt-in, and it has to be: `PYTEST_CURRENT_TEST` is set by pytest for every
-    test it runs, so reading that turned the stub on for the whole of a suite
-    with no way to turn it off - including the tests that spawn a real viewer
-    and ask it a real question. Those got the canned four-key config and failed
-    on the first key they looked for.
-
-    The name carries no host, but the mechanism is the golden master's: a
-    variable a test suite sets deliberately, for the tests that want the stub.
+    Opt-in, and it must stay opt-in. A variable pytest sets itself - such as
+    `PYTEST_CURRENT_TEST` - would turn the stub on for every test in a suite
+    with no way to turn it off, including the ones that spawn a real viewer and
+    ask it real questions; those would receive canned data and fail on the
+    first key they looked for.
     """
     return os.environ.get("OCP_VIEWER_PYTEST") == "1"

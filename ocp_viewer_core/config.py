@@ -1,3 +1,27 @@
+"""Configuration: the defaults, the precedence over them, and the enums.
+
+`Config` answers what a show is drawn with, from three sources - the workspace
+settings a host stores, the viewer's own reported state, and the defaults set
+in code. A host supplies two lists: the keys it stores, and the keys it may not
+be told because its surface decides them.
+"""
+
+#
+# Copyright 2026 Bernhard Walter
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import warnings
 from enum import Enum
 
@@ -129,16 +153,13 @@ DEFAULT_DEFAULTS = {
     "debug": False,
 }
 
-# What `reset_defaults` does *not* put back, and the asymmetry is load-bearing.
-# `combined_config` applies the defaults last, so a key here masks whatever the
-# viewer reports for it - and `collapse` is the viewer's own: it is settable, the
-# user changes it by clicking, and it comes back in `status`. Keeping it after a
-# reset makes `combined_config` answer Collapse.ROOT however the tree actually
-# stands, so a show would re-collapse a tree the user had opened.
-#
-# The golden master had exactly this, as a commented-out line in the dict its
-# `reset_defaults` rebuilt. Restoring the whole dict on reset is what put it
-# back, and two collapse tests found it the moment a real viewer could answer.
+# The defaults `reset_defaults` does *not* put back, and the asymmetry is
+# load-bearing. `combined_config` applies the defaults last, so a key listed
+# among them masks whatever the viewer reports for it. `collapse` is the
+# viewer's own - the user changes it by clicking, and it comes back in
+# `status` - so keeping it after a reset would make `combined_config` answer
+# `Collapse.ROOT` however the tree actually stands, and the next show would
+# re-collapse a tree the user had opened.
 NOT_RESTORED_ON_RESET = ("collapse",)
 
 
@@ -194,9 +215,9 @@ class Config:
         notebook. Returning a sentence rather than a boolean is deliberate, so
         the warning can say why instead of only that.
         """
-        # TODO: the golden master also excluded `theme`, and exclude_keys does
-        # not. Left out deliberately - it may be sendable to every client -
-        # and to be settled once ocp_vscode and jupyter-cadquery are ported.
+        # TODO: `theme` may belong in every host's exclusion list, since a
+        # surface generally decides its own. Left out until a host is found
+        # that needs to be told one.
         if key in self.exclude_keys:
             return f"{key} is determined by the host and cannot be set here"
         return None
@@ -358,12 +379,9 @@ class Config:
         glass=None,
         tools=None,
         tree_width=None,
-        # `up` is settable and had no parameter, so `reset_defaults` - which
-        # builds its call from the settable keys - raised TypeError the moment a
-        # real viewer answered with one. The golden master's list did not carry
-        # `up`, and nothing could reach this until a viewer was listening: every
-        # run until now got a refused connection and a four-key dummy config.
-        # The renderer has always been able to apply it; only this was missing.
+        # Every key in `keys.SETTABLE` needs a parameter here: `reset_defaults`
+        # builds its call from that list, and one without a parameter raises
+        # TypeError as soon as a viewer reports it.
         up=None,
         collapse=None,
         reset_camera=None,
@@ -612,10 +630,8 @@ class Config:
 
         self.validate_tool_args(explode, analysis_tool)
 
-        # `self` is excluded because locals() has it too, and it is not None.
-        # As a module function this had no self to trip over; as a method it
-        # reached the loop below and printed "'self' is an unknown config,
-        # ignored!" on every call. set_viewer_config already excluded it.
+        # `self` is excluded explicitly: `locals()` includes it, it is never
+        # None, and the loop below would report it as an unknown config key.
         kwargs = {k: v for k, v in locals().items() if v is not None and k != "self"}
 
         kwargs = self.check_deprecated(kwargs)

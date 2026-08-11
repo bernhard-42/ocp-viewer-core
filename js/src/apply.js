@@ -1,10 +1,9 @@
 /**
  * Applying a configuration to a running three-cad-viewer instance.
  *
- * This is the shared half of what ocp_vscode's `viewer.html` does in its `ui`
- * message branch and what cad-viewer-widget does in `handle_change`. Both walked
- * a set of changed keys and turned each into a call on the viewer; both had
- * their own copy of the same table, and the copies had drifted.
+ * One dispatch for every host: a set of changed keys in, a call on the viewer
+ * for each. A host asked to apply a configuration - from Python, or from a
+ * widget's own change observer - routes it through here.
  *
  * The keys are camelCase and the values are plain JSON, because that is what
  * this side of the wire speaks. Python owns snake_case and the enums, and
@@ -13,10 +12,9 @@
  * host that has not converted, and it should surface as an unknown key rather
  * than be quietly accepted in both spellings.
  *
- * cad-viewer-widget is the one host that converts on this side instead. Its
- * traitlet name is the wire - ipywidgets shares one name across both halves -
- * so its change observer maps before calling in. The rule is unchanged; only
- * the place it happens is.
+ * A host whose wire format shares one name across both halves - an ipywidgets
+ * traitlet, say - converts before calling in. The rule is the same; only the
+ * place it is applied differs.
  *
  * The method is not derivable from the name: `grid` is `setGrids`, `glass` is
  * `glassMode`, `tools` is `showTools`, `collapse` is `collapseNodes`. Deriving a
@@ -26,6 +24,22 @@
  * Nothing here touches the DOM, a transport, or a host, so it can be tested
  * headless against a stub viewer.
  */
+
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 // Keys whose value is a viewport dimension. Only the host knows the other two,
 // so applying one means asking the host to resize rather than calling the
@@ -202,7 +216,7 @@ export function isApplicable(key) {
  *                               otherwise re-apply what it just reported
  *                   onUnknown - (key, value) => void, for a key nothing here
  *                               handles. Left unset the key is dropped, which is
- *                               what both hosts do today - but silently
+ *                               the default, but silently
  * @returns the keys that were applied
  */
 export function applyConfig(viewer, config, ctx = {}) {

@@ -1,23 +1,32 @@
 /**
- * The viewer page: everything a host's HTML used to hold, held once.
+ * The viewer page, held once for every host that shows one.
  *
- * ocp_vscode's webview and ocp_viewer's page were the same file with a few
- * values injected, then two files with the injection removed - single-source
- * logic with a template problem, traded for a template fix with a duplication
- * problem. This is both: the logic lives here, in the package the hosts already
- * import, and each page keeps only what is genuinely its own.
- *
- * Which turns out to be very little. Of the 436 lines the two pages shared,
- * 295 were identical - including `getSize`, `normalizeWidth` and
- * `normalizeHeight`, which look host-specific and are not: both hosts measure
- * the window and subtract the same chrome. What differs is how the page is
- * started and how a message is sent, and those arrive as arguments.
+ * A host's HTML supplies only what is genuinely its own: where it loaded these
+ * modules from, where its settings come from, and how to send a message. Even
+ * measuring the surface is here - every host so far measures the window and
+ * subtracts the same chrome, and one that does not can pass its own geometry.
  *
  * This is the one module in the package that touches the DOM, and it does so
  * because it *is* the page. Everything else here takes a viewer and plain data
  * and could run headless; that distinction is worth keeping, so new DOM work
  * belongs in this file or in a host, not spread through the others.
  */
+
+/*
+   Copyright 2026 Bernhard Walter
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 import { animate } from "./animation.js";
 import { applyConfig } from "./apply.js";
@@ -52,12 +61,11 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
     var viewerOptions = {};
     var last_bb_radius = null;
 
-    // The viewer's own state, as the renderer reports it. What used to
-    // be a variable per value here - status.zoom, status.position, _clipping,
-    // _zebra - is one object the notifier keeps, under the names the
-    // renderer notifies with: camelCase for the camera, which is sent
-    // straight to checkChanges, and snake_case for everything that goes
-    // through its notification map. render() writes into it too, after
+    // The viewer's own state, as the renderer reports it: one object the
+    // notifier keeps, under the names the renderer notifies with - camelCase
+    // for the camera, which is sent straight to checkChanges, and snake_case
+    // for everything that goes through its notification map. render() writes
+    // into it too, after
     // reading the camera back off the viewer.
     //
     // It is also what goes on the wire. The extension answers a status
@@ -240,11 +248,9 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
         }
 
         if (data.type === "logo") {
-            // The splash lives in the core, so the host asks for it by
-            // name and sends only what it alone knows - its theme, its
-            // tree width, its modifier keys. It used to ship its own
-            // 200 kB copy and post the whole model across; two hosts had
-            // the same file byte for byte.
+            // The splash lives in the core, so a host asks for it by name and
+            // sends only what it alone knows: its theme, its tree width and
+            // its modifier keys.
             const splash = logo();
             data = {
                 ...splash,
@@ -304,11 +310,8 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
             if (data.config.debug) {
                 debugLog("data.config", data.config);
             }
-            // One dispatch, shared with cad-viewer-widget, in place of
-            // thirty-eight else-ifs that had drifted from its copy. It
-            // also brings the eleven studio setters this host never had:
-            // set_viewer_config accepted them and the webview dropped
-            // them without a word.
+            // One dispatch for every key, shared with every other host, so
+            // that a setter cannot exist in one client and not another.
             applyConfig(viewer, data.config, {
                 // Only the host knows the other two dimensions, so a
                 // viewport key is a resize rather than a setter.

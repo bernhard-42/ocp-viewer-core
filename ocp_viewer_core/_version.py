@@ -1,3 +1,6 @@
+"""The package version, written by `make bump`.
+"""
+
 #
 # Copyright 2026 Bernhard Walter
 #

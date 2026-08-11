@@ -1,3 +1,11 @@
+"""The registry of running viewers, in `~/.ocpvscode`.
+
+Every viewer records its port here when it starts and removes it when it
+stops, and every client reads it to find one. Shared between the packages and
+between the languages: the VS Code extension writes this file in TypeScript,
+which is why the name keeps a host in it.
+"""
+
 #
 # Copyright 2025 Bernhard Walter
 #
@@ -12,6 +20,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
 
 import errno
 import json
