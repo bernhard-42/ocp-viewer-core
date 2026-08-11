@@ -14,6 +14,80 @@
  * renamed into something plausible.
  */
 
+// The defaults themselves, not only the key lists. They describe
+// three-cad-viewer, so every client should start from the same numbers and
+// override only what is genuinely its own - a viewer whose ambient light or
+// whose metalness differs from another's for no stated reason is a difference
+// nobody chose.
+
+/** Defaults for `Viewer.render`'s second argument. */
+export const RENDER_DEFAULTS = {
+  ambientIntensity: 1.0,
+  directIntensity: 1.1,
+  metalness: 0.3,
+  roughness: 0.65,
+  edgeColor: 0x707070,
+  defaultOpacity: 0.5,
+  normalLen: 0,
+  angularTolerance: 0.2,
+  deviation: 0.1,
+  defaultColor: "#e8b024",
+};
+
+/** Defaults for `Viewer.render`'s third argument. */
+export const VIEWER_DEFAULTS = {
+  timeit: false,
+  zoom: 1.0,
+  position: null,
+  quaternion: null,
+  target: null,
+  centerGrid: false,
+  gridFontSize: 12,
+  newTreeBehavior: true,
+  studioEnvironment: "studio",
+  studioEnvIntensity: 1.0,
+  studioEnvRotation: 0,
+  studioBackground: "environment",
+  studioToneMapping: "neutral",
+  studioExposure: 1.0,
+  studioShadowIntensity: 0.5,
+  studioShadowSoftness: 0.2,
+  studioAOIntensity: 0.5,
+  studioTextureMapping: "parametric",
+  studio4kEnvMaps: false,
+};
+
+/**
+ * Defaults for `new Display(container, options)`.
+ *
+ * `cadWidth`, `height` and `treeWidth` are here for completeness and are always
+ * replaced by the geometry the host measures. The tool flags say which tools
+ * exist in this surface at all, which is a host's decision - these are the
+ * common answer, not the only one.
+ */
+export const DISPLAY_DEFAULTS = {
+  cadWidth: 730,
+  height: 525,
+  treeWidth: 240,
+  glass: false,
+  tools: true,
+  theme: "browser",
+  pinning: false,
+  newTreeBehavior: true,
+  keymap: {
+    shift: "shiftKey",
+    ctrl: "ctrlKey",
+    meta: "metaKey",
+    alt: "altKey",
+  },
+  measureTools: true,
+  selectTool: true,
+  explodeTool: true,
+  zebraTool: true,
+  zscaleTool: false,
+  externalMeasurementBackend: true,
+};
+
 /** Options `Viewer.render` takes as its second argument. */
 export const RENDER_OPTION_KEYS = [
   "ambientIntensity",
@@ -94,12 +168,18 @@ function pick(keys, config, defaults) {
   return options;
 }
 
-export function buildRenderOptions(config, defaults) {
-  return pick(RENDER_OPTION_KEYS, config, defaults);
+// Each builder starts from the core's defaults and lets a host override the
+// ones that are genuinely its own. A host that passes nothing gets the shared
+// answer, which is the point: the numbers describe three-cad-viewer, so a
+// client differing from another for no stated reason is a difference nobody
+// chose.
+
+export function buildRenderOptions(config, overrides) {
+  return pick(RENDER_OPTION_KEYS, config, { ...RENDER_DEFAULTS, ...overrides });
 }
 
-export function buildViewerOptions(config, defaults) {
-  return pick(VIEWER_OPTION_KEYS, config, defaults);
+export function buildViewerOptions(config, overrides) {
+  return pick(VIEWER_OPTION_KEYS, config, { ...VIEWER_DEFAULTS, ...overrides });
 }
 
 /**
@@ -116,7 +196,8 @@ export function buildViewerOptions(config, defaults) {
  * does not express. Taken from `theme` when the host sends one, derived from
  * `dark` when it does not, and left to the default otherwise.
  */
-export function buildDisplayOptions(config, defaults, geometry) {
+export function buildDisplayOptions(config, overrides, geometry) {
+  const defaults = { ...DISPLAY_DEFAULTS, ...overrides };
   const fromConfig = pick(["glass", "tools", "keymap", "newTreeBehavior"], config, defaults);
 
   let theme = preset(config, "theme", null);
@@ -124,7 +205,7 @@ export function buildDisplayOptions(config, defaults, geometry) {
     theme = config.dark ? "dark" : "light";
   }
   if (theme == null) {
-    theme = defaults == null ? undefined : defaults.theme;
+    theme = defaults.theme;
   }
 
   return {
@@ -136,12 +217,11 @@ export function buildDisplayOptions(config, defaults, geometry) {
 
     // Capability flags the host owns: whether a tool exists in this surface at
     // all is not something a document can ask for.
-    measureTools: defaults == null ? undefined : defaults.measureTools,
-    selectTool: defaults == null ? undefined : defaults.selectTool,
-    explodeTool: defaults == null ? undefined : defaults.explodeTool,
-    zscaleTool: defaults == null ? undefined : defaults.zscaleTool,
-    zebraTool: defaults == null ? undefined : defaults.zebraTool,
-    externalMeasurementBackend:
-      defaults == null ? undefined : defaults.externalMeasurementBackend,
+    measureTools: defaults.measureTools,
+    selectTool: defaults.selectTool,
+    explodeTool: defaults.explodeTool,
+    zscaleTool: defaults.zscaleTool,
+    zebraTool: defaults.zebraTool,
+    externalMeasurementBackend: defaults.externalMeasurementBackend,
   };
 }

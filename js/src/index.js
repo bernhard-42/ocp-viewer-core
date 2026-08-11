@@ -10,16 +10,23 @@
  * of the wire speaks. Python converts once, at the boundary, on its way out.
  */
 
-export { applyConfig, isApplicable, GEOMETRY_KEYS } from "./apply.js";
+export { applyConfig, isApplicable, GEOMETRY_KEYS, VIEWS } from "./apply.js";
 
 export {
   buildDisplayOptions,
   buildRenderOptions,
   buildViewerOptions,
   preset,
+  DISPLAY_DEFAULTS,
+  RENDER_DEFAULTS,
   RENDER_OPTION_KEYS,
+  VIEWER_DEFAULTS,
   VIEWER_OPTION_KEYS,
 } from "./options.js";
+
+// Drawing a model and deciding where the camera ends up - the policy every
+// client has to agree on, and the one that was hardest to get right.
+export { createRenderer } from "./render.js";
 
 export {
   collectStates,

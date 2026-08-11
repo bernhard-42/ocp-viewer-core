@@ -36,7 +36,7 @@ export const GEOMETRY_KEYS = ["cadWidth", "treeWidth", "height"];
 // The camera views `resetCamera` accepts beyond "reset", which is "iso" plus a
 // resize. Anything else - including "keep" - deliberately does nothing, because
 // `setView` on an unknown name leaves the camera where it was with no error.
-const VIEWS = ["iso", "left", "right", "top", "bottom", "rear", "front"];
+export const VIEWS = ["iso", "left", "right", "top", "bottom", "rear", "front"];
 
 const TOOLS = ["distance", "properties", "select"];
 
