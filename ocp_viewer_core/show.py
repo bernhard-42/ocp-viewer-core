@@ -809,7 +809,19 @@ class Viewer(Generic[H]):
         alphas=None,
         modes=None,
         materials=None,
+        # Host keywords. The signature is the superset of what every client
+        # takes, so one definition serves all of them: a host acts on the ones
+        # it owns, and `Config.validate_keyword` refuses the others by name.
+        # `cad_width` and `height` are a surface's own in a panel or a browser
+        # window, and a caller's in a notebook cell - which is the clearest case
+        # for why the list is per host rather than per key.
         port=None,
+        viewer=None,
+        anchor=None,
+        cad_width=None,
+        height=None,
+        pinning=None,
+        theme=None,
         progress="-+*c",
         glass=None,
         tools=None,
@@ -909,9 +921,13 @@ class Viewer(Generic[H]):
                                                  "+": gets tessellated with Python code,
                                                  "*": gets tessellated with native code,
                                                  "c": from cache
-            port:                    Kept for signature compatibility. The host's transport owns the
-                                     connection, so this no longer selects one; it is forwarded to the
-                                     viewer in the config exactly as before.
+            port:                    The viewer to address, for a host that runs more than one
+            viewer:                  The sidecar to draw into, for a host that has sidecars
+            anchor:                  Where to open that sidecar
+            cad_width:               Width of the viewer, where the caller decides it
+            height:                  Height of the viewer, where the caller decides it
+            pinning:                 Whether the view can be pinned as a PNG
+            theme:                   "light", "dark" or "browser"
 
         Valid keywords to configure the viewer (**kwargs):
         - UI
@@ -1211,7 +1227,19 @@ class Viewer(Generic[H]):
         update=False,
         mode=None,
         material=None,
+        # Host keywords. The signature is the superset of what every client
+        # takes, so one definition serves all of them: a host acts on the ones
+        # it owns, and `Config.validate_keyword` refuses the others by name.
+        # `cad_width` and `height` are a surface's own in a panel or a browser
+        # window, and a caller's in a notebook cell - which is the clearest case
+        # for why the list is per host rather than per key.
         port=None,
+        viewer=None,
+        anchor=None,
+        cad_width=None,
+        height=None,
+        pinning=None,
+        theme=None,
         progress="-+*c",
         glass=None,
         tools=None,
@@ -1309,8 +1337,13 @@ class Viewer(Generic[H]):
                                      Render.FACES: show faces only
                                      Render.NONE: hide object
             material:                Material object or material name string for this object (default=None)
-            port:                    Kept for signature compatibility. The host's transport owns the
-                                     connection, so this no longer selects one.
+            port:                    The viewer to address, for a host that runs more than one
+            viewer:                  The sidecar to draw into, for a host that has sidecars
+            anchor:                  Where to open that sidecar
+            cad_width:               Width of the viewer, where the caller decides it
+            height:                  Height of the viewer, where the caller decides it
+            pinning:                 Whether the view can be pinned as a PNG
+            theme:                   "light", "dark" or "browser"
             progress:                Show progress of tessellation with None is no progress indicator. (default="-+*c")
                                      for object: "-": is reference,
                                                  "+": gets tessellated with Python code,
@@ -1603,7 +1636,19 @@ class Viewer(Generic[H]):
     def show_objects(
         self,
         modes=None,
+        # Host keywords. The signature is the superset of what every client
+        # takes, so one definition serves all of them: a host acts on the ones
+        # it owns, and `Config.validate_keyword` refuses the others by name.
+        # `cad_width` and `height` are a surface's own in a panel or a browser
+        # window, and a caller's in a notebook cell - which is the clearest case
+        # for why the list is per host rather than per key.
         port=None,
+        viewer=None,
+        anchor=None,
+        cad_width=None,
+        height=None,
+        pinning=None,
+        theme=None,
         progress="-+*c",
         glass=None,
         tools=None,

@@ -94,6 +94,20 @@ class Comms(Generic[H]):
         """Answer a request from the viewer"""
         raise NotImplementedError
 
+    def encode_config(self, config: Any) -> Any:
+        """Put a config block into the names this host's viewer reads.
+
+        The sender translates to the receiver's paradigm, and for most hosts
+        the receiver is three-cad-viewer reached over a wire, which speaks
+        camelCase - so the default renames. A host whose two halves share one
+        name, as an ipywidgets traitlet does, receives what Python sent and
+        overrides this with the identity.
+
+        On `Comms` rather than applied by the caller, because only the host
+        knows what is at the other end.
+        """
+        return to_javascript(config)
+
     def listen(self, callback) -> None:
         """Take messages from the viewer until it stops, calling back for each.
 
@@ -209,25 +223,24 @@ class Session(Generic[H]):
         self.comms.end()
 
     def send_data(self, data: Any, timeit: bool = False) -> H:
-        """Send a model, translating its config block on the way out.
+        """Send a model, putting its config block into the host's names.
 
-        Here rather than in `Comms`, because `Comms` is what a host overrides -
-        a conversion on the base class would be skipped by every host that
-        implements the method, which is all of them. `Session` is the last
-        shared code before the host's transport, so it is where "the sender
-        translates to the receiver's paradigm" can actually be enforced.
+        Applied here rather than left to each host: `Session` is the last
+        shared code before the transport, so this is where the rule holds for
+        everyone. What the names should be is the host's answer, which is why
+        the renaming itself is `Comms.encode_config`.
 
         Only the config block is renamed. The rest of the envelope is geometry
         with its own keys, and walking it would be both wrong and expensive.
         """
         if isinstance(data, dict) and isinstance(data.get("config"), dict):
-            data = {**data, "config": to_javascript(data["config"])}
+            data = {**data, "config": self.comms.encode_config(data["config"])}
         return self.comms.send_data(data, timeit=timeit)
 
     def set_viewer(self, config: Any) -> None:
         data = {
             "type": "ui",
-            "config": to_javascript(config),
+            "config": self.comms.encode_config(config),
         }
 
         try:
