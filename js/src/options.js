@@ -37,7 +37,11 @@ export const RENDER_DEFAULTS = {
   directIntensity: 1.1,
   metalness: 0.3,
   roughness: 0.65,
-  edgeColor: 0x707070,
+  // A CSS colour rather than 0x707070. The renderer takes either, but Python
+  // always sends this form - `Color(...).web_color` - and a host that mirrors
+  // what the renderer reports back into a string-typed setting cannot take the
+  // number. One representation across the ecosystem, and it is this one.
+  edgeColor: "#707070",
   defaultOpacity: 0.5,
   normalLen: 0,
   angularTolerance: 0.2,
@@ -174,7 +178,19 @@ export function preset(config, key, fallback) {
 function pick(keys, config, defaults) {
   const options = {};
   for (const key of keys) {
-    options[key] = preset(config, key, defaults == null ? undefined : defaults[key]);
+    const value = preset(config, key, defaults == null ? undefined : defaults[key]);
+    // A key nobody has a value for is left out rather than passed as
+    // undefined. The two are not the same to the renderer: an option that is
+    // present is applied, and applying undefined resets whatever it names -
+    // which for a camera key means the viewer reports null back, and a host
+    // whose settings are typed refuses it.
+    //
+    // It matters most for a host whose config comes from what a user has set
+    // rather than from a stored workspace, where most keys are legitimately
+    // absent.
+    if (value !== undefined) {
+      options[key] = value;
+    }
   }
   return options;
 }
