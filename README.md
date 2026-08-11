@@ -26,6 +26,8 @@ Early development. Nothing here is published, and the API changes without notice
 | `ocp_viewer_core/`          | the Python half                                                                                     |
 | `ocp_viewer_core/config.py` | the config keys, each mapped to the name three-cad-viewer knows it by, and the precedence over them |
 | `ocp_viewer_core/comms.py`  | the transport a host implements, and the session that caches what it answers                        |
+| `ocp_viewer_core/logo.py`   | the splash logo as measurable geometry, for a host's measurement backend                            |
+| `js/src/logo.js`            | the splash logo as tessellated data plus its config, for the renderer                                |
 | `js/`                       | the JavaScript half, published to npm                                                               |
 | `tests/`                    | including the conformance kit                                                                       |
 

@@ -31,3 +31,7 @@ export {
 export { addAnimationTrack, animate, animationDuration } from "./animation.js";
 
 export { createNotifier, EVENT_KEYS } from "./notify.js";
+
+// The splash. Data rather than policy, and here for the same reason the policy
+// is: every client shows it, and four of them had their own copy.
+export { logo } from "./logo.js";
