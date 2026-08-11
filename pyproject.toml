@@ -46,10 +46,13 @@ dev = ["build", "bump-my-version", "black", "pytest", "twine"]
 where = ["."]
 include = ["ocp_viewer_core*"]
 
-# black settings
+# ruff and ty are the whole toolchain: `ruff check` lints, `ty check` types, and
+# nothing reformats. A formatter was dropped deliberately - black rewrapped a
+# line onto two and carried the trailing `# noqa` onto the wrong one, where it
+# suppressed nothing, so the linter and the formatter undid each other.
 
-[tool.black]
-target-version = ["py310", "py311", "py312", "py313"]
+[tool.ruff]
+target-version = "py310"
 line-length = 88
 
 # bump-my-version settings

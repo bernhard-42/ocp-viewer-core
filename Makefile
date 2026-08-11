@@ -1,4 +1,4 @@
-.PHONY: clean bump install tests format dist wheel tarball check_dist upload_test upload release
+.PHONY: clean bump install tests check dist wheel tarball check_dist upload_test upload release
 
 PYCACHE := $(shell find . -name '__pycache__')
 EGGS := $(wildcard *.egg-info)
@@ -33,8 +33,11 @@ install:
 tests:
 	pytest -q
 
-format:
-	black .
+# The whole toolchain. No formatter, on purpose - see the note in pyproject.toml.
+
+check:
+	uvx ruff@0.16.0 check ocp_viewer_core/
+	uvx ty@0.0.62 check ocp_viewer_core/
 
 # Distribution
 #
