@@ -219,7 +219,7 @@ class Config:
         # surface generally decides its own. Left out until a host is found
         # that needs to be told one.
         if key in self.exclude_keys:
-            return f"{key} is determined by the host and cannot be set here"
+            return f"'{key}' is not something this viewer can be told"
         return None
 
     def validate_tool_args(

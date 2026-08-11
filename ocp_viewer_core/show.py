@@ -612,8 +612,12 @@ class Viewer(Generic[H]):
         }
 
         for k, v in kwargs.items():
-            if k in exclude_keys:
-                print(f"Setting {k} cannot be set here, the host determines it")
+            refusal = self.config.validate_keyword(k)
+            if refusal is not None:
+                # Asked rather than tested, so that a host can say why. A panel
+                # decides its own width; a notebook has no port at all, and the
+                # two deserve different sentences.
+                print(refusal)
 
             elif v is not None:
                 if k == "reset_camera" and params.get("_splash") is True:
