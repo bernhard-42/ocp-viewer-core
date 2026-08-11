@@ -27,7 +27,7 @@ import types
 import warnings
 from enum import Enum
 from logging import Logger
-from typing import Generic, Optional
+from typing import Generic
 
 from ocp_tessellate import OcpGroup
 from ocp_tessellate.cad_objects import (
@@ -444,7 +444,7 @@ class Viewer(Generic[H]):
     defect this class exists to close.
 
     `H` is the host's viewer handle, carried from `Comms`. `show` returns
-    `Optional[H]`, so a host whose transport hands a widget back gives its users
+    `H | None`, so a host whose transport hands a widget back gives its users
     a widget with the right type on it, and a host with nothing to return gives
     them None - from one signature and with no branch. Bind it at construction:
     `Viewer[MyWidget](config)`.
@@ -716,9 +716,14 @@ class Viewer(Generic[H]):
         with Timer(timeit, "", "bb", 1):
             bb = combined_bb(shapes)
             if bb is None:
-                bb = dict(
-                    xmin=-1e-6, ymin=-1e-6, zmin=-1e-6, xmax=1e-6, ymax=1e-6, zmax=1e-6
-                )
+                bb = {
+                    "xmin": -1e-6,
+                    "ymin": -1e-6,
+                    "zmin": -1e-6,
+                    "xmax": 1e-6,
+                    "ymax": 1e-6,
+                    "zmax": 1e-6,
+                }
             else:
                 bb = bb.to_dict()
 
@@ -825,7 +830,7 @@ class Viewer(Generic[H]):
             if is_pytest():
                 return (instances, shapes, config, count_shapes), mapping
             data = numpy_to_buffer_json(
-                dict(instances=instances, shapes=shapes),
+                {"instances": instances, "shapes": shapes},
             )
             return {
                 "data": data,
@@ -924,7 +929,7 @@ class Viewer(Generic[H]):
         debug=None,
         timeit=None,
         _force_in_debug=False,
-    ) -> Optional[H]:
+    ) -> H | None:
         # pylint: disable=line-too-long
         """Show CAD objects in the viewer
         Parameters
@@ -1065,7 +1070,7 @@ class Viewer(Generic[H]):
         self.config.validate_tool_args(explode, analysis_tool)
         return self._show(*cad_objs, **none_filter(locals(), ["cad_objs", "self"]))
 
-    def _show(self, *cad_objs, **kwargs) -> Optional[H]:
+    def _show(self, *cad_objs, **kwargs) -> H | None:
         """Send one model, and forget what this show read.
 
         Every model send routes through here - `show` calls it directly, and
@@ -1077,13 +1082,18 @@ class Viewer(Generic[H]):
 
         In a `finally`, because a show that raises must not leave the next one
         trusting answers from a viewer that has since moved on.
+
+        `begin` opens the same scope for this call's keywords, so the transport
+        can act on the ones that are its own - `port` here, `title` in a
+        notebook - from the first read onwards rather than from the model send.
         """
+        self.config.session.begin(kwargs)
         try:
             return self._show_impl(*cad_objs, **kwargs)
         finally:
             self.config.session.clear()
 
-    def _show_impl(self, *cad_objs, **kwargs) -> Optional[H]:
+    def _show_impl(self, *cad_objs, **kwargs) -> H | None:
         timeit = kwargs.get("timeit")
         names = kwargs.get("names")
         colors = kwargs.get("colors")
@@ -1132,9 +1142,8 @@ class Viewer(Generic[H]):
         if modes is None:
             modes = kwargs.pop("modes", None)
 
-        if kwargs.get("grid") is not None:
-            if isinstance(kwargs["grid"], bool):
-                kwargs["grid"] = [kwargs["grid"]] * 3
+        if kwargs.get("grid") is not None and isinstance(kwargs["grid"], bool):
+            kwargs["grid"] = [kwargs["grid"]] * 3
 
         timeit = self.config.preset("timeit", timeit)
 
@@ -1199,7 +1208,7 @@ class Viewer(Generic[H]):
             print()
 
         if is_pytest():
-            # The one place the `Optional[H]` annotation is not the truth: under
+            # The one place the `H | None` annotation is not the truth: under
             # pytest `_convert` returns the tessellation instead of a wire
             # message and nothing is sent, so there is no handle to hand back.
             # Preserved from the golden master rather than typed honestly,
@@ -1323,7 +1332,7 @@ class Viewer(Generic[H]):
         studio_4k_env_maps=None,
         debug=None,
         timeit=None,
-    ) -> Optional[H]:
+    ) -> H | None:
         # pylint: disable=line-too-long
         """Incrementally show CAD objects in the viewer
 
@@ -1471,7 +1480,7 @@ class Viewer(Generic[H]):
 
     def remove_object(
         self, name, call_show=False, port=None, progress="-+*c"
-    ) -> Optional[H]:
+    ) -> H | None:
         """Remove object from the stack of objects by name"""
         try:
             index = self.objects["names"].index(name)
@@ -1493,7 +1502,7 @@ class Viewer(Generic[H]):
             )
         return None
 
-    def _show_object(self, obj, **kwargs) -> Optional[H]:
+    def _show_object(self, obj, **kwargs) -> H | None:
         port = kwargs.get("port")
         name = kwargs.get("name")
         clear = kwargs.get("clear")
@@ -1612,9 +1621,8 @@ class Viewer(Generic[H]):
                 name = obj.label
             else:
                 raise ValueError("No name provided and no name attribute found.")
-        if color is None:
-            if hasattr(obj, "color"):
-                color = obj.color
+        if color is None and hasattr(obj, "color"):
+            color = obj.color
         if alpha is None:
             if hasattr(obj, "alpha"):
                 alpha = obj.alpha
@@ -1716,7 +1724,7 @@ class Viewer(Generic[H]):
         studio_4k_env_maps=None,
         debug=None,
         timeit=None,
-    ) -> Optional[H]:
+    ) -> H | None:
         # pylint: disable=line-too-long
         """Show incrementally pushed CAD objects in the viewer
 
@@ -1871,7 +1879,7 @@ class Viewer(Generic[H]):
         include=None,
         _visual_debug=False,
         **kwargs,
-    ) -> Optional[H]:
+    ) -> H | None:
         """
         Show all variables in the current scope
 
@@ -1989,10 +1997,11 @@ class Viewer(Generic[H]):
                 classes is not None
                 and include is not None
                 and isinstance(include, (tuple, list))
+                and name in include
+                and name not in names
             ):
-                if name in include and name not in names:
-                    objects.append(variables[name])
-                    names.append(name)
+                objects.append(obj)
+                names.append(name)
 
         if len(objects) > 0:
             try:
@@ -2010,7 +2019,7 @@ class Viewer(Generic[H]):
                 # branch and the unconditional return are the same three
                 # behaviours, and there is nothing left to branch on.
                 return result
-            except Exception as ex:  # pylint: disable=broad-exception-caught
+            except Exception as ex:  # pylint: disable=broad-exception-caught  # noqa: BLE001
                 print("show_all:", ex)
                 traceback.print_exc()
         else:
@@ -2020,7 +2029,13 @@ class Viewer(Generic[H]):
         return None
 
     def save_screenshot(self, filename, port=None, polling=True, progress_only=False):
-        """Save a screenshot of the current view"""
+        """Save a screenshot of the current view
+
+        `port` is a host keyword like any other: it is handed to the transport
+        for the length of this call and means whatever that host makes of it.
+        Before the scope existed it was accepted here and threaded nowhere, so a
+        screenshot asked of a second viewer was taken of the first.
+        """
         if not filename.startswith(os.sep):
             prefix = pathlib.Path(".").absolute()
             full_path = str(prefix / filename)
@@ -2029,7 +2044,11 @@ class Viewer(Generic[H]):
         p = pathlib.Path(full_path)
         mtime = p.stat().st_mtime if p.exists() else 0
 
-        self.comms.send_command({"type": "screenshot", "filename": f"{full_path}"})
+        self.config.session.begin({"port": port})
+        try:
+            self.comms.send_command({"type": "screenshot", "filename": f"{full_path}"})
+        finally:
+            self.config.session.clear()
 
         if polling:
             done = False

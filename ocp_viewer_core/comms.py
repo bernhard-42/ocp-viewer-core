@@ -19,7 +19,12 @@ class Comms(Generic[H]):
     vocabulary is fixed, which is what makes the layer above swappable.
     """
 
-    def __init__(self): ...
+    def __init__(self):
+        # The keywords of the call in flight. A host reads what it owns out of
+        # this - `port` for ocp_vscode and the standalone, `title`/`viewer` for
+        # Jupyter CadQuery - inside its own send methods, where knowing what
+        # those mean is legitimate.
+        self.keywords: dict = {}
 
     # Each raises rather than returning None. A body of just a docstring types
     # as returning None, which is both a lie - send_data promises a handle - and
@@ -62,6 +67,36 @@ class Comms(Generic[H]):
         """
         return False
 
+    # `begin` and `end` have a working default, like `is_handle` and unlike the
+    # five above: every host gets the keywords whether or not it wants them.
+
+    def begin(self, keywords: Any) -> None:
+        """Take the keywords of the call about to be made.
+
+        The show family is the superset of every host's parameters, and each
+        host acts on its own and ignores the rest - `Config.validate_keyword` is
+        the half of that rule which refuses a keyword this host cannot act on,
+        and this is the half that delivers one it can. What a keyword means is
+        the host's business; the core only says which call it belongs to.
+
+        It has to be a scope rather than an argument because the reads come
+        first: `_tessellate` asks for `status` and `workspace_config` before any
+        model is sent, so a `port` carried only in the model's config block
+        would reach the transport two round trips too late, and
+
+            show(obj, port=3939)
+            show(obj, port=3940)
+
+        would read the second model's camera and tree state from the first
+        viewer. Binding `show = viewer.show` fixes one Comms per Viewer for its
+        whole life, so the port cannot be a constructor argument either.
+        """
+        self.keywords = dict(keywords) if keywords else {}
+
+    def end(self) -> None:
+        """Forget the keywords, at the end of the call that set them."""
+        self.keywords = {}
+
 
 class Session(Generic[H]):
     """One show's worth of conversation with the viewer.
@@ -78,6 +113,17 @@ class Session(Generic[H]):
         self.comms = comms
         self._status = None
         self._workspace_config = None
+
+    def begin(self, keywords: Any) -> None:
+        """Open a call's scope: the transport hears this call's keywords.
+
+        Paired with `clear`, and for the same reason - the keywords and the
+        cached answers have exactly one lifetime between them, which is one
+        call. Routed through the Session rather than reaching into `comms`
+        from `show`, so that a host overriding `Comms.begin` sees every call
+        the core makes and not only the ones show happens to know about.
+        """
+        self.comms.begin(keywords)
 
     def status(self) -> Any:
         if self._status is None:
@@ -102,9 +148,14 @@ class Session(Generic[H]):
         Clearing rather than rebuilding the Session matters now that a host
         binds `show = viewer.show` once: the objects stay put for the life of
         the Viewer and only the answers are short-lived.
+
+        The call's keywords end here too. They are scoped to the same call as
+        the answers, so one method closes both rather than a host having to
+        remember two.
         """
         self._status = None
         self._workspace_config = None
+        self.comms.end()
 
     def send_data(self, data: Any, timeit: bool = False) -> H:
         """Send a model, translating its config block on the way out.
