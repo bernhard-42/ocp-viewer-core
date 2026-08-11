@@ -129,6 +129,18 @@ DEFAULT_DEFAULTS = {
     "debug": False,
 }
 
+# What `reset_defaults` does *not* put back, and the asymmetry is load-bearing.
+# `combined_config` applies the defaults last, so a key here masks whatever the
+# viewer reports for it - and `collapse` is the viewer's own: it is settable, the
+# user changes it by clicking, and it comes back in `status`. Keeping it after a
+# reset makes `combined_config` answer Collapse.ROOT however the tree actually
+# stands, so a show would re-collapse a tree the user had opened.
+#
+# The golden master had exactly this, as a commented-out line in the dict its
+# `reset_defaults` rebuilt. Restoring the whole dict on reset is what put it
+# back, and two collapse tests found it the moment a real viewer could answer.
+NOT_RESTORED_ON_RESET = ("collapse",)
+
 
 class Config:
     def __init__(self, session: Session, workspace_config_keys, exclude_keys):
@@ -346,6 +358,13 @@ class Config:
         glass=None,
         tools=None,
         tree_width=None,
+        # `up` is settable and had no parameter, so `reset_defaults` - which
+        # builds its call from the settable keys - raised TypeError the moment a
+        # real viewer answered with one. The golden master's list did not carry
+        # `up`, and nothing could reach this until a viewer was listening: every
+        # run until now got a refused connection and a four-key dummy config.
+        # The renderer has always been able to apply it; only this was missing.
+        up=None,
         collapse=None,
         reset_camera=None,
         states=None,
@@ -627,7 +646,11 @@ class Config:
             if config.get("transparent") is not None:
                 self.set_viewer_config(transparent=config["transparent"])
 
-        self.defaults = dict(DEFAULT_DEFAULTS)
+        self.defaults = {
+            key: value
+            for key, value in DEFAULT_DEFAULTS.items()
+            if key not in NOT_RESTORED_ON_RESET
+        }
 
     def check_deprecated(self, kwargs, _length=1):
         """Check for deprecated arguments"""

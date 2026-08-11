@@ -1,7 +1,25 @@
+import enum
 import os
 from typing import Any, Generic, TypeVar
 
 from .keys import to_javascript
+
+
+class MessageType(enum.IntEnum):
+    """What a message on the wire is.
+
+    The protocol itself, so it belongs with the transport contract rather than
+    with any one implementation of it. Every host encodes these numbers the same
+    way; what differs is the socket underneath.
+    """
+
+    DATA = 1
+    COMMAND = 2
+    UPDATES = 3
+    LISTEN = 4
+    BACKEND = 5
+    BACKEND_RESPONSE = 6
+    CONFIG = 7
 
 # What a host's transport hands back when a model is sent. Jupyter CadQuery
 # returns its widget, so its users can go on to call methods on it; ocp_vscode
@@ -51,6 +69,19 @@ class Comms(Generic[H]):
 
     def send_response(self, data: Any, timeit: bool = False) -> None:
         """Answer a request from the viewer"""
+        raise NotImplementedError
+
+    def listen(self, callback) -> None:
+        """Take messages from the viewer until it stops, calling back for each.
+
+        The other direction, and the one only the measurement backend needs: it
+        is a process of its own that waits to be asked. `callback(payload,
+        message_type)` per message, and the call does not return until the
+        viewer says stop.
+
+        A host with no such channel need not override this - Jupyter CadQuery
+        answers in-process and never listens.
+        """
         raise NotImplementedError
 
     def is_handle(self, obj: Any) -> bool:
