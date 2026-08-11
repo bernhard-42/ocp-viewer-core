@@ -36,7 +36,7 @@ classifiers = [
 dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson", "threejs-materials>=1.2.0,<1.3.0"]
 
 [project.optional-dependencies]
-dev = ["bump-my-version", "black", "pytest", "twine"]
+dev = ["build", "bump-my-version", "black", "pytest", "twine"]
 
 [project.urls]
 "Homepage" = "https://github.com/bernhard-42/ocp-viewer-core"
