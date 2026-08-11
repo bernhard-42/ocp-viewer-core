@@ -189,4 +189,15 @@ class Session(Generic[H]):
 
 
 def is_pytest():
-    return "PYTEST_CURRENT_TEST" in os.environ
+    """Whether to answer from canned data instead of asking a viewer.
+
+    Opt-in, and it has to be: `PYTEST_CURRENT_TEST` is set by pytest for every
+    test it runs, so reading that turned the stub on for the whole of a suite
+    with no way to turn it off - including the tests that spawn a real viewer
+    and ask it a real question. Those got the canned four-key config and failed
+    on the first key they looked for.
+
+    The name carries no host, but the mechanism is the golden master's: a
+    variable a test suite sets deliberately, for the tests that want the stub.
+    """
+    return os.environ.get("OCP_VIEWER_PYTEST") == "1"

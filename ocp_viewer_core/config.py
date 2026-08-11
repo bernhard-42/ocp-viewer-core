@@ -593,7 +593,11 @@ class Config:
 
         self.validate_tool_args(explode, analysis_tool)
 
-        kwargs = {k: v for k, v in locals().items() if v is not None}
+        # `self` is excluded because locals() has it too, and it is not None.
+        # As a module function this had no self to trip over; as a method it
+        # reached the loop below and printed "'self' is an unknown config,
+        # ignored!" on every call. set_viewer_config already excluded it.
+        kwargs = {k: v for k, v in locals().items() if v is not None and k != "self"}
 
         kwargs = self.check_deprecated(kwargs)
 

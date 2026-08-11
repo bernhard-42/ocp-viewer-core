@@ -63,6 +63,7 @@ from ocp_tessellate.ocp_utils import (
 from ocp_tessellate.utils import Color, Timer, numpy_to_buffer_json
 from threejs_materials import PbrProperties
 
+from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
 
@@ -229,40 +230,6 @@ def is_build123d_material(material):
         and hasattr(material, "finish")
         and hasattr(material, "material")
     )
-
-
-class BaseColorMap:
-    """Base class for color maps.
-
-    TODO(next session): this is the one piece of `ocp_vscode/colors.py` the show
-    path needs, and it is here only because `_show` does
-    `isinstance(colors, BaseColorMap)` - which means the host's `ColorMap.tab10()`
-    has to be an instance of *this* class, not of a second copy. The rest of
-    colors.py (the colormap catalogue, the mappers, `web_to_rgb`, `ColorMap`) was
-    left where it is.
-
-    Putting it here has a cost worth deciding on rather than absorbing: once
-    ocp_vscode's colors.py imports from this module, `from ocp_vscode.colors
-    import ColorMap` pulls OCP, because this module imports ocp_tessellate.
-    colors.py itself needs nothing but colorsys, random and webcolors. The
-    obvious answer is an OCP-free `ocp_viewer_core/colors.py` holding the whole
-    of it, but that is a file this step was not asked to create. Question for
-    Bernhard: move colors.py wholesale, or keep only this class here?
-    """
-
-    def __init__(self):
-        self.index = 0
-        self.alpha = 1.0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        raise NotImplementedError()
-
-    def reset(self):
-        """Reset the color map"""
-        self.index = 0
 
 
 class ShowProgress(Progress):
