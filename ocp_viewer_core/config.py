@@ -413,6 +413,10 @@ class Config:
         studio_texture_mapping=None,
         studio_4k_env_maps=None,
         analysis_tool=None,
+        # Host keywords, as on `show`: which viewer this is addressed to. Every
+        # client accepts them and each acts on the ones it owns.
+        port=None,
+        viewer=None,
     ):
         """Set viewer config"""
         self.validate_tool_args(explode, analysis_tool)
@@ -435,7 +439,14 @@ class Config:
         if config.get("default_edgecolor") is not None:
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
 
-        self.session.set_viewer(config)
+        # The transport hears the host keywords for the length of this call, as
+        # it does for a show: a host with more than one viewer needs to know
+        # which of them is being configured.
+        self.session.begin({"port": port, "viewer": viewer})
+        try:
+            self.session.set_viewer(config)
+        finally:
+            self.session.clear()
 
     def set_defaults(
         self,
