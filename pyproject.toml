@@ -28,7 +28,12 @@ classifiers = [
 # No OCP provider is declared, deliberately: the same OCP namespace is shipped
 # by cadquery_ocp, cadquery_ocp_novtk and conda's OCP, and naming one would
 # break the users of the other two. The host or the user chooses.
-dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson"]
+# threejs-materials is a show-path dependency, not an optional one: `_tessellate`
+# tests `isinstance(node.material, PbrProperties)` to tell a threejs material from
+# a build123d one, and an isinstance needs the class. The bound is ocp_vscode's,
+# unchanged (vscode-ocp-cad-viewer/pyproject.toml:42), so nothing has to be
+# re-resolved when the host adopts the core.
+dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson", "threejs-materials>=1.2.0,<1.3.0"]
 
 [project.optional-dependencies]
 dev = ["bump-my-version", "black", "pytest", "twine"]

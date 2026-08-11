@@ -3,6 +3,7 @@ from enum import Enum
 
 from ocp_tessellate.utils import Color
 
+from . import keys
 from .comms import Session, is_pytest
 
 __all__ = []
@@ -112,30 +113,21 @@ COLLAPSE_REVERSE_MAPPING = {
 }
 
 
-def _snake_to_camel(name):
-    """The mechanical spelling, for keys the renderer has no option name for."""
-    head, *rest = name.split("_")
-    return head + "".join(word[:1].upper() + word[1:] for word in rest)
-
-
-def merge(*mappings):
-    """Merge {python_name: javascript_name} mappings, refusing a redefinition.
-
-    A key belonging to more than one group is ordinary - ui_material is both a
-    ui group and a renderer group - and is not a conflict as long as every group
-    names the same renderer option. Two groups disagreeing is a bug, and taking
-    the last one silently is what concatenating tuples used to do: the old
-    workspace list carried four keys twice for exactly that reason.
-    """
-    merged = {}
-    for mapping in mappings:
-        for key, js_name in mapping.items():
-            if key in merged and merged[key] != js_name:
-                raise ValueError(
-                    f"'{key}' is mapped to both {merged[key]!r} and {js_name!r}"
-                )
-            merged[key] = js_name
-    return merged
+# The defaults that are ours rather than the viewer's - the ones no workspace
+# setting and no viewer state supplies. Module level and copied per instance,
+# so construction and reset_defaults() read one source instead of two literals
+# that drift.
+DEFAULT_DEFAULTS = {
+    "render_normals": False,
+    "render_mates": False,
+    "render_joints": False,
+    "helper_scale": 1.0,
+    "show_parent": False,
+    "show_locals": True,
+    "timeit": False,
+    "collapse": Collapse.ROOT,
+    "debug": False,
+}
 
 
 class Config:
@@ -154,206 +146,48 @@ class Config:
         # _update drops an unknown option without a diagnostic - so the name is
         # written down beside the key it belongs to.
 
-        self.ui_toolbar = {
-            "axes": "axes",
-            "axes0": "axes0",
-            "grid": "grid",
-            "ortho": "ortho",
-            "transparent": "transparent",
-            "black_edges": "blackEdges",
-            "explode": None,  # applied by code (setExplode)
-            "analysis_tool": None,  # tool activation, not an option
-            "tab": "tab",
-        }
+        # The key vocabulary lives in keys.py: it describes three-cad-viewer
+        # rather than this host, both halves of the package need it, and neither
+        # config nor comms may import the other. Bound to attributes here so the
+        # methods below read the same as they did when they built it.
+        self.ui_toolbar = keys.UI_TOOLBAR
+        self.ui_tree = keys.UI_TREE
+        self.ui_clip = keys.UI_CLIP
+        self.ui_zebra = keys.UI_ZEBRA
+        self.ui_studio = keys.UI_STUDIO
+        self.ui_material = keys.UI_MATERIAL
+        self.ui = keys.UI
+        self.display = keys.DISPLAY
+        self.mouse = keys.MOUSE
+        self.grid = keys.GRID
+        self.renderer = keys.RENDERER
+        self.control = keys.CONTROL
+        self.camera = keys.CAMERA
+        self.all = keys.ALL
+        self.settable = keys.SETTABLE
 
-        self.ui_tree = {
-            "collapse": "collapse",
-            "states": None,  # applied by code (setStates)
-        }
+        self.defaults = dict(DEFAULT_DEFAULTS)
 
-        self.ui_clip = {
-            "clip_intersection": "clipIntersection",
-            "clip_normal_0": "clipNormal0",
-            "clip_normal_1": "clipNormal1",
-            "clip_normal_2": "clipNormal2",
-            "clip_object_colors": "clipObjectColors",
-            "clip_planes": "clipPlaneHelpers",
-            "clip_slider_0": "clipSlider0",
-            "clip_slider_1": "clipSlider1",
-            "clip_slider_2": "clipSlider2",
-        }
+    def validate_keyword(self, key):
+        """Why this host cannot act on `key`, or None if it can.
 
-        self.ui_zebra = {
-            "zebra_color_scheme": "zebraColorScheme",
-            "zebra_count": "zebraCount",
-            "zebra_direction": "zebraDirection",
-            "zebra_mapping_mode": "zebraMappingMode",
-            "zebra_opacity": "zebraOpacity",
-        }
+        One question, one mechanism. `exclude_keys` already answers it for the
+        keys a host does not own - ocp_vscode cannot set `cad_width` or
+        `height`, because the webview decides them - so that list is the default
+        implementation rather than a second thing to keep in step.
 
-        self.ui_studio = {
-            "studio_4k_env_maps": "studio4kEnvMaps",
-            "studio_ao_intensity": "studioAOIntensity",
-            "studio_background": "studioBackground",
-            "studio_env_intensity": "studioEnvIntensity",
-            "studio_env_rotation": "studioEnvRotation",
-            "studio_environment": "studioEnvironment",
-            "studio_exposure": "studioExposure",
-            "studio_shadow_intensity": "studioShadowIntensity",
-            "studio_shadow_softness": "studioShadowSoftness",
-            "studio_texture_mapping": "studioTextureMapping",
-            "studio_tone_mapping": "studioToneMapping",
-        }
-
-        self.ui_material = {
-            "ambient_intensity": "ambientIntensity",
-            "direct_intensity": "directIntensity",
-            "metalness": "metalness",
-            "roughness": "roughness",
-        }
-
-        self.ui = merge(
-            self.ui_toolbar,
-            self.ui_tree,
-            self.ui_clip,
-            self.ui_zebra,
-            self.ui_studio,
-            self.ui_material,
-        )
-
-        self.display = {
-            "tree_width": "treeWidth",
-            "cad_width": "cadWidth",
-            "height": "height",
-            "tools": "tools",
-            "glass": "glass",
-            "dark": None,  # theme, but bool to "dark"/"light" is a value change
-            "modifier_keys": "keymap",
-            "orbit_control": "control",
-            "up": "up",
-        }
-
-        self.mouse = {
-            "pan_speed": "panSpeed",
-            "rotate_speed": "rotateSpeed",
-            "zoom_speed": "zoomSpeed",
-        }
-
-        self.grid = {
-            "grid_font_size": "gridFontSize",
-            "ticks": "ticks",
-            "center_grid": "centerGrid",
-        }
-
-        self.renderer = merge(
-            self.ui_material,
-            {
-                "angular_tolerance": None,
-                "deviation": None,
-                "edge_accuracy": None,
-                "default_color": None,
-                "default_facecolor": None,
-                "default_edgecolor": "edgeColor",
-                "default_thickedgecolor": None,
-                "default_vertexcolor": None,
-                "default_opacity": "defaultOpacity",
-            },
-        )
-
-        self.control = {
-            "debug": None,
-            "helper_scale": None,
-            "render_joints": None,
-            "render_mates": None,
-            "render_normals": None,
-            "reset_camera": None,  # applied by code (setView)
-            "show_parent": None,
-            "show_locals": None,
-            "timeit": "timeit",
-        }
-
-        self.camera = {
-            "position": "position",
-            "quaternion": "quaternion",
-            "target": "target",
-            "zoom": "zoom",
-        }
-
-        self.all = merge(
-            self.ui,
-            self.display,
-            self.mouse,
-            self.grid,
-            self.renderer,
-            self.control,
-            self.camera,
-        )
-
-        # The extras are keys the groups above already name, so they are taken
-        # from the catalogue rather than spelled a second time: a typo here is a
-        # KeyError, not a second spelling of a renderer option.
-        self.settable = merge(
-            self.ui_tree,
-            self.ui_toolbar,
-            self.ui_material,
-            self.ui_clip,
-            self.ui_zebra,
-            # The studio family is settable because the shared dispatch applies
-            # it. viewer.html's own switch never had these eleven branches, so
-            # under ocp_vscode 4.x sending one posted a message the browser
-            # dropped in silence; cad-viewer-widget has always had them as a
-            # setter table. They belong here from the moment viewer.html calls
-            # into the shared apply, and not before.
-            self.ui_studio,
-            self.mouse,
-            self.camera,
-            {
-                key: self.all[key]
-                for key in (
-                    "tree_width",
-                    "tools",
-                    "glass",
-                    "up",
-                    "center_grid",
-                    "default_edgecolor",
-                    "default_opacity",
-                    "reset_camera",
-                )
-            },
-        )
-
-        self.defaults = {
-            "render_normals": False,
-            "render_mates": False,
-            "render_joints": False,
-            "helper_scale": 1.0,
-            "show_parent": False,
-            "show_locals": True,
-            "timeit": False,
-            "collapse": Collapse.ROOT,
-            "debug": False,
-        }
-
-    def to_javascript(self, config):
-        """Rename Python keys to the names the JavaScript half uses.
-
-        Python speaks snake_case and enums; JavaScript speaks camelCase and the
-        enum values. This is the one place the two meet, which is the whole
-        reason the mapping lives in ocp_viewer_core and not in a host.
-
-        A key the renderer knows as an option is renamed to that name, taken
-        from the groups above rather than derived: a mechanical transform gets
-        clip_planes, default_edgecolor and studio_ao_intensity wrong, and gets
-        them wrong silently, because the renderer drops an option it does not
-        recognise without a word. A key applied by calling a method instead of
-        by setting an option has no renderer name, so its wire spelling is the
-        mechanical transform of ours - explode, states, reset_camera.
+        A host overrides this when a keyword is meaningless to it rather than
+        merely not its to set: `port` selects which viewer to address when
+        several are open, which is real in VS Code and has no meaning in a
+        notebook. Returning a sentence rather than a boolean is deliberate, so
+        the warning can say why instead of only that.
         """
-        renamed = {}
-        for key, value in config.items():
-            js_name = self.all.get(key)
-            renamed[js_name if js_name is not None else _snake_to_camel(key)] = value
-        return renamed
+        # TODO: the golden master also excluded `theme`, and exclude_keys does
+        # not. Left out deliberately - it may be sendable to every client -
+        # and to be settled once ocp_vscode and jupyter-cadquery are ported.
+        if key in self.exclude_keys:
+            return f"{key} is determined by the host and cannot be set here"
+        return None
 
     def validate_tool_args(
         self, explode: bool | None, analysis_tool: AnalysisTool | str | None
@@ -564,7 +398,7 @@ class Config:
         if config.get("default_edgecolor") is not None:
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
 
-        self.session.set_viewer(self.to_javascript(config))
+        self.session.set_viewer(config)
 
     def set_defaults(
         self,
@@ -752,11 +586,7 @@ class Config:
             debug:              Show debug statements to the VS Code browser console (default=False)
             timeit:             Show timing information from level 0-3 (default=False)
 
-        - VS Code only:
-            port:              THe port the viewer is running on
-
         - Jupyter Cadquery only:
-            viewer:             The title of the sidecar in Jupyter CadQuery
             cad_width:          The viewer width in  Jupyter CadQuery
             height:             The viewer height in  Jupyter CadQuery
         """
@@ -777,32 +607,23 @@ class Config:
             **{k: v for k, v in kwargs.items() if k in self.settable},
         )
 
-    def reset_defaults(self):
+    def reset_defaults(self, apply=True):
         """Reset defaults not given in workspace config"""
 
-        config = {
-            key: value
-            for key, value in self.workspace_config().items()
-            if key in self.settable
-        }
-        config["reset_camera"] = Camera.KEEP
+        if apply:
+            config = {
+                key: value
+                for key, value in self.workspace_config().items()
+                if key in self.settable
+            }
+            config["reset_camera"] = Camera.KEEP
 
-        self.set_viewer_config(**config)
+            self.set_viewer_config(**config)
 
-        if config.get("transparent") is not None:
-            self.set_viewer_config(transparent=config["transparent"])
+            if config.get("transparent") is not None:
+                self.set_viewer_config(transparent=config["transparent"])
 
-        self.defaults = {
-            "render_normals": False,
-            "render_mates": False,
-            "render_joints": False,
-            "helper_scale": 1.0,
-            "show_parent": False,
-            "show_locals": True,
-            # "collapse": Collapse.ROOT,
-            "timeit": False,
-            "debug": False,
-        }
+        self.defaults = dict(DEFAULT_DEFAULTS)
 
     def check_deprecated(self, kwargs, _length=1):
         """Check for deprecated arguments"""
