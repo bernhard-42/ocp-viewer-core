@@ -102,6 +102,11 @@ const SETTERS = {
   panSpeed: (v, value, ctx) => call(v, "setPanSpeed", [value], ctx.notify),
   rotateSpeed: (v, value, ctx) => call(v, "setRotateSpeed", [value], ctx.notify),
 
+  // "light", "dark", or "browser" to follow the surface. Applied on a live
+  // viewer as well as at construction, which is what lets a host whose theme
+  // changes under it - a VS Code colour theme - say so without rebuilding.
+  theme: (v, value) => v.setTheme(value),
+
   glass: (v, value, ctx) => call(v, "glassMode", [value], ctx.notify),
   tools: (v, value, ctx) => call(v, "showTools", [value], ctx.notify),
   tab: (v, value, ctx) => call(v, "setActiveTab", [value], ctx.notify),

@@ -217,23 +217,17 @@ export function buildViewerOptions(config, overrides) {
  * on and what to subtract for its own chrome. It supplies `cadWidth`, `height`
  * and `treeWidth` already normalised.
  *
- * `theme` is the one value that is not carried across as-is. ocp_vscode's
- * config says `dark`, a boolean, while the renderer wants "dark" or "light" -
- * a change of value rather than of name, which the name mapping deliberately
- * does not express. Taken from `theme` when the host sends one, derived from
- * `dark` when it does not, and left to the default otherwise.
+ * `theme` arrives as "light", "dark" or "browser" and is passed through: it is
+ * one word in every language here, and the renderer resolves "browser" itself.
+ * The boolean `dark` it replaced is gone from the vocabulary - it had not been
+ * on the wire since 2025, because each host converted it to `theme` before
+ * answering a config request.
  */
 export function buildDisplayOptions(config, overrides, geometry) {
   const defaults = { ...DISPLAY_DEFAULTS, ...overrides };
   const fromConfig = pick(["glass", "tools", "keymap", "newTreeBehavior"], config, defaults);
 
-  let theme = preset(config, "theme", null);
-  if (theme == null && config != null && config.dark != null) {
-    theme = config.dark ? "dark" : "light";
-  }
-  if (theme == null) {
-    theme = defaults.theme;
-  }
+  const theme = preset(config, "theme", defaults.theme);
 
   return {
     ...fromConfig,

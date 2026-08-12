@@ -123,7 +123,14 @@ DISPLAY = {
     "height": "height",
     "tools": "tools",
     "glass": "glass",
-    "dark": None,  # theme, but bool to "dark"/"light" is a value change
+    # "light", "dark" or "browser" - what three-cad-viewer's setTheme takes and
+    # what every host's setting already holds. `dark`, a boolean, preceded it
+    # and was superseded in September 2025; from then on it never travelled on
+    # the wire, because the extension converted it to `theme` before answering a
+    # config request. It stayed in the vocabulary for another year regardless,
+    # which is what a key nothing produces costs: nothing, until something
+    # checks.
+    "theme": "theme",
     "modifier_keys": "keymap",
     "orbit_control": "control",
     "up": "up",
@@ -211,6 +218,10 @@ SETTABLE = merge(
             "default_edgecolor",
             "default_opacity",
             "reset_camera",
+            # Changeable on a live viewer, not only at construction: the
+            # renderer has setTheme, and a host whose surface changes theme
+            # under it - a VS Code colour theme - needs to say so.
+            "theme",
         )
     },
 )

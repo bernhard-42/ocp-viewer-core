@@ -41,7 +41,6 @@ from ocp_tessellate.cad_objects import (
 from ocp_tessellate.convert import (
     Progress,
     combined_bb,
-    get_normal_len,
     tessellate_group,
     to_ocpgroup,
 )
@@ -670,11 +669,14 @@ class Viewer(Generic[H]):
         if modes is not None and any(m is not None for m in modes):
             params["states"] = part_group.to_state()
 
-        params["normal_len"] = get_normal_len(
-            self.config.preset("render_normals", params.get("render_normals")),
-            shapes,
-            self.config.preset("deviation", params.get("deviation")),
-        )
+        # Read, not computed: the tessellator has already turned
+        # `render_normals` and `deviation` into a length by this point -
+        # `max_accuracy / deviation * 4 if render_normals else 0`. The
+        # `get_normal_len` this replaces took all three and used only `shapes`,
+        # so the two preset lookups were resolved and discarded, and the call
+        # read as though `render_normals` were still being consulted here.
+        # ocp_tessellate's own TODO asks for exactly this.
+        params["normal_len"] = shapes["normal_len"]
 
         with Timer(timeit, "", "bb", 1):
             bb = combined_bb(shapes)
@@ -775,9 +777,12 @@ class Viewer(Generic[H]):
         if extracted_materials:
             shapes["materials"] = extracted_materials
 
-        if config.get("dark") is not None:
-            config["theme"] = "dark"
-        elif config.get("orbit_control") is not None:
+        # `orbit_control` is a boolean and the renderer takes a name, so this is
+        # a change of value rather than of name and the key mapping cannot
+        # express it. It used to sit in an `elif` behind a `dark` branch, which
+        # meant a config carrying `dark` silently skipped it - unreachable in
+        # practice only because nothing had produced `dark` since 2025.
+        if config.get("orbit_control") is not None:
             config["control"] = "orbit" if config["orbit_control"] else "trackball"
 
         if config.get("debug") is not None and config["debug"]:
@@ -838,7 +843,6 @@ class Viewer(Generic[H]):
         default_opacity=None,
         black_edges=None,
         orbit_control=None,
-        control=None,
         collapse=None,
         explode=None,
         analysis_tool=None,
@@ -889,7 +893,6 @@ class Viewer(Generic[H]):
         show_locals=None,
         show_sketch_local=None,  # DEPRECATED
         helper_scale=None,
-        mate_scale=None,  # DEPRECATED
         studio_environment=None,
         studio_env_intensity=None,
         studio_env_rotation=None,
@@ -1306,7 +1309,6 @@ class Viewer(Generic[H]):
         show_locals=None,
         show_sketch_local=None,  # DEPRECATED
         helper_scale=None,
-        mate_scale=None,  # DEPRECATED
         studio_environment=None,
         studio_env_intensity=None,
         studio_env_rotation=None,
@@ -1715,7 +1717,6 @@ class Viewer(Generic[H]):
         show_locals=None,
         show_sketch_local=None,  # DEPRECATED
         helper_scale=None,
-        mate_scale=None,  # DEPRECATED
         studio_environment=None,
         studio_env_intensity=None,
         studio_env_rotation=None,

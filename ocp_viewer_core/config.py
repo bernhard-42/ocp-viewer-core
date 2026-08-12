@@ -215,9 +215,11 @@ class Config:
         notebook. Returning a sentence rather than a boolean is deliberate, so
         the warning can say why instead of only that.
         """
-        # TODO: `theme` may belong in every host's exclusion list, since a
-        # surface generally decides its own. Left out until a host is found
-        # that needs to be told one.
+        # `theme` was open here once, on the argument that a surface decides its
+        # own. It does not: every host stores a theme setting, all three accept
+        # "browser" to mean "follow the surface", and the renderer takes it as an
+        # option like any other. It is an ordinary config key and no host
+        # excludes it.
         if key in self.exclude_keys:
             return f"'{key}' is not something this viewer can be told"
         return None
@@ -379,6 +381,7 @@ class Config:
         glass=None,
         tools=None,
         tree_width=None,
+        theme=None,
         # Every key in `keys.SETTABLE` needs a parameter here: `reset_defaults`
         # builds its call from that list, and one without a parameter raises
         # TypeError as soon as a viewer reports it.
@@ -461,6 +464,7 @@ class Config:
         default_opacity=None,
         black_edges=None,
         orbit_control=None,
+        theme=None,
         collapse=None,
         ticks=None,
         center_grid=None,
@@ -505,7 +509,6 @@ class Config:
         show_locals=None,
         show_sketch_local=None,  # DEPRECATED
         helper_scale=None,
-        mate_scale=None,  # DEPRECATED
         studio_environment=None,
         studio_env_intensity=None,
         studio_env_rotation=None,
@@ -540,6 +543,7 @@ class Config:
             default_opacity:    Opacity value for transparent objects (default=0.5)
             black_edges:        Show edges in black color (default=False)
             orbit_control:      Mouse control use "orbit" control instead of "trackball" control (default=False)
+            theme:              "light", "dark", or "browser" to follow the surface (default="browser")
             collapse:           Collapse.LEAVES: collapse all single leaf nodes,
                                 Collapse.ROOT: expand root only,
                                 Collapse.ALL: collapse all nodes,
@@ -681,11 +685,6 @@ class Config:
 
     def check_deprecated(self, kwargs, _length=1):
         """Check for deprecated arguments"""
-        if kwargs.get("mate_scale") is not None:
-            print("\nmate_scale is deprecated, use helper_scale instead\n")
-            kwargs["helper_scale"] = kwargs["mate_scale"]
-            del kwargs["mate_scale"]
-
         if kwargs.get("reset_camera") is True:
             print(
                 "\n'reset_camera=True' is deprecated, use 'reset_camera=Camera.RESET' instead\n"
@@ -735,12 +734,6 @@ class Config:
                     kwargs["modes"] = [Render.FACES] * _length
 
             del kwargs["render_edges"]
-
-        if kwargs.get("control") is not None:
-            print(
-                "\n'control=\"orbit\" or \"trackball\"' is deprecated, use 'orbit_control=True' or 'False' instead\n"
-            )
-            kwargs["orbit_control"] = kwargs["control"] == "orbit"
 
         if kwargs.get("show_sketch_local") is not None:
             print("\n'show_sketch_local' is deprecated, use 'show_locals' instead\n")

@@ -270,7 +270,7 @@ Two details that cost real bugs:
 - **`preset` tests against `null`, not truthiness.** `null` and `undefined` both mean "not given" — a host sending an explicit null is asking for the default. Every other falsy value (`false`, `0`, `""`) is a value the caller meant. Getting that wrong turns `axes: false` into `axes: true` wherever the default is on.
 - **A key nobody has a value for is left out rather than passed as `undefined`.** The two are not the same to the renderer: an option that is *present* is applied, and applying `undefined` resets whatever it names — which for a camera key means the viewer reports `null` back, and a host whose settings are typed refuses it. This matters most for a host whose config comes from what a user set rather than from a stored workspace, where most keys are legitimately absent.
 
-`theme` is the one value not carried across as-is: the config says `dark`, a boolean, and the renderer wants `"dark"` or `"light"` — a change of *value* rather than of *name*, which the key mapping deliberately does not express, so `buildDisplayOptions` derives it.
+`theme` is `"light"`, `"dark"` or `"browser"` and is passed straight through — one word in both languages, with the renderer resolving `"browser"` itself. The boolean `dark` it replaced is gone from the vocabulary; see the settled list below.
 
 ## `notify.js` — reporting back
 
@@ -564,16 +564,17 @@ Settled, and not to be re-opened:
 - **Bound methods** are the API shape, for the completion reason measured above.
 - **`apply_defaults` is kept** in `ocp_tessellate`, with its NaN fix.
 - **There is one splash, and it is the viewer's.** Not one per host: a logo is built for the viewer, and every client shows that one. Jupyter CadQuery's own logo is retired.
+- **`theme` is an ordinary config key and no host excludes it.** It was open on the argument that a surface decides its own; it does not — every host stores a theme setting, all three accept `"browser"` to mean "follow the surface", and the renderer takes it as an option like any other. It is in `SETTABLE` and `apply.js` calls `setTheme`, so it can also be changed on a live viewer.
+- **`dark` is gone.** A boolean that three-cad-viewer never took, superseded by `theme` in September 2025 and dead on the wire from that day, because each host converted it before answering a config request. It survived in the vocabulary for another year — which is what a key nothing produces costs: nothing, until something checks. Removing it also deleted two defects that sat on its unreachable branch in `_convert`: `dark=False` set the theme to `"dark"`, and an `elif` meant a config carrying `dark` skipped the `orbit_control` → `control` conversion entirely.
+- **`control` and `mate_scale` are unknown keywords**, not deprecated spellings. `control` had been deprecated for several releases and was accepted only by `show`, where `show_object`, `show_objects` and `set_defaults` already raised `TypeError` — so removing it made all four agree.
 
-Open — one question, and three pieces of work:
-
-**Still a question: `theme`.** The golden master excluded it; no host's `exclude_keys` does. Left out until a host is found that needs to be told one. There is a `TODO` on `Config.validate_keyword` saying so.
+Open — three pieces of work:
 
 **To do: retire Jupyter CadQuery's splash.** `jupyter_cadquery/logo.py` still carries 196 kB of its own tessellated logo, and `open_viewer` draws it — while handing the measurement backend the *core's* logo. So in a sidecar today, the splash you see is not the splash you can measure. Retiring it closes that as a side effect. Two routes: draw it in JavaScript, since `cad-viewer-widget` already bundles the core and `logo` is already exported there — one copy of the payload, and `open_viewer` loses its `add_shapes` call; or ship the tessellated splash from the core's Python beside the BREP, which is the smaller diff and ~200 kB more in the wheel.
 
 **To do: finish cad-viewer-widget's adoption — `createRenderer` and the setter dispatch, and they share a prerequisite.**
 
-Its 43 `handle_change` cases split three ways: **28** already name a key `applyConfig` handles and could route through it today; **9** are keys `applyConfig` handles but which have **no entry in the widget's `TRAIT_TO_OPTION`** — `position`, `quaternion`, `target`, `zoom`, `reset_camera`, `explode`, `tab`, `cad_width`, `tree_width`, `height`, all read straight off the model instead; and **6** are genuinely this host's and stay in the switch — `pinning`, `tracks`, `state_updates`, `debug`, `disposed`, `measure`.
+Its 43 `handle_change` cases split three ways: **28** already name a key `applyConfig` handles and could route through it today; **9** are keys `applyConfig` handles but which have **no entry in the widget's `TRAIT_TO_OPTION`** — `position`, `quaternion`, `target`, `zoom`, `explode`, `tab`, `cad_width`, `tree_width`, `height`, all read straight off the model instead (`reset_camera` is a tenth gap in that table, though not a `handle_change` case); and **6** are genuinely this host's and stay in the switch — `pinning`, `tracks`, `state_updates`, `debug`, `disposed`, `measure`.
 
 Those 9 are also what blocks `createRenderer`, which is why the two jobs are one job. `traitsAsConfig()` iterates `Object.keys(TRAIT_TO_OPTION)`, so a trait absent from that table is not read at all — the config the shared renderer would be handed today carries none of the keys it steers by. **Filling the table is step one for both.**
 
