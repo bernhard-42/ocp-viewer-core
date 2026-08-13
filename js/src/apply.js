@@ -79,7 +79,12 @@ const SETTERS = {
   blackEdges: (v, value, ctx) => call(v, "setBlackEdges", [value], ctx.notify),
 
   zoom: (v, value, ctx) => call(v, "setCameraZoom", [value], ctx.notify),
-  position: (v, value, ctx) => call(v, "setCameraPosition", [value], ctx.notify),
+  // `setCameraPosition(position, relative, notify)` takes a flag between the
+  // value and the notify flag that the other three camera setters do not, so
+  // `relative` is passed explicitly. Without it a host that asks for
+  // notification lands `true` in that slot and the camera moves *by* the
+  // vector instead of *to* it.
+  position: (v, value, ctx) => call(v, "setCameraPosition", [value, false], ctx.notify),
   quaternion: (v, value, ctx) => call(v, "setCameraQuaternion", [value], ctx.notify),
   target: (v, value, ctx) => call(v, "setCameraTarget", [value], ctx.notify),
 
@@ -199,6 +204,63 @@ function clipSetter(key) {
   }
   return null;
 }
+
+/**
+ * What the viewer currently holds for a key, or `undefined` if it cannot be
+ * read back.
+ *
+ * The other half of `SETTERS`, and here for the same reason: which getter
+ * answers for which option is three-cad-viewer's fact, not a host's, and a
+ * wrong pairing is silent. It exists for `applyConfig`'s `accept` hook - a host
+ * driven by change notifications needs to know whether a value is already in
+ * place, or it re-applies what the viewer just told it.
+ *
+ * `undefined` means "no way to ask", not "unset", and a caller should read that
+ * as "apply it". Several settings are genuinely write-only from here - explode
+ * and the tab are actions rather than state, and the studio family has no
+ * getters at all.
+ */
+export function currentValue(viewer, key) {
+  const getter = GETTERS[key];
+  return getter === undefined ? undefined : getter(viewer);
+}
+
+const GETTERS = {
+  axes: (v) => v.getAxes(),
+  axes0: (v) => v.getAxes0(),
+  grid: (v) => v.getGrids(),
+  ortho: (v) => v.getOrtho(),
+  transparent: (v) => v.getTransparent(),
+  blackEdges: (v) => v.getBlackEdges(),
+  tools: (v) => v.getTools(),
+
+  zoom: (v) => v.getCameraZoom(),
+  position: (v) => v.getCameraPosition(),
+  quaternion: (v) => v.getCameraQuaternion(),
+  target: (v) => v.getCameraTarget(),
+
+  edgeColor: (v) => v.getEdgeColor(),
+  defaultOpacity: (v) => v.getOpacity(),
+  ambientIntensity: (v) => v.getAmbientLight(),
+  directIntensity: (v) => v.getDirectLight(),
+  metalness: (v) => v.getMetalness(),
+  roughness: (v) => v.getRoughness(),
+
+  zoomSpeed: (v) => v.getZoomSpeed(),
+  panSpeed: (v) => v.getPanSpeed(),
+  rotateSpeed: (v) => v.getRotateSpeed(),
+
+  clipIntersection: (v) => v.getClipIntersection(),
+  clipPlaneHelpers: (v) => v.getClipPlaneHelpers(),
+  clipObjectColors: (v) => v.getObjectColorCaps(),
+
+  clipSlider0: (v) => v.getClipSlider(0),
+  clipSlider1: (v) => v.getClipSlider(1),
+  clipSlider2: (v) => v.getClipSlider(2),
+  clipNormal0: (v) => v.getClipNormal(0),
+  clipNormal1: (v) => v.getClipNormal(1),
+  clipNormal2: (v) => v.getClipNormal(2),
+};
 
 /** Whether this key is one `applyConfig` knows how to apply. */
 export function isApplicable(key) {

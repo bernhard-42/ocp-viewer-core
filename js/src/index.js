@@ -27,7 +27,7 @@
    limitations under the License.
 */
 
-export { applyConfig, isApplicable, GEOMETRY_KEYS, VIEWS } from "./apply.js";
+export { applyConfig, currentValue, isApplicable, GEOMETRY_KEYS, VIEWS } from "./apply.js";
 
 export {
   buildDisplayOptions,

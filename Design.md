@@ -199,7 +199,7 @@ Warnings are deliberately module-level rather than instance state: `warnings` is
 | -------------- | --------------------------------------------------------------------------------------------------- | ------------------------ |
 | `page.js`      | `createPage`                                                                                        | **yes — it is the page** |
 | `render.js`    | `createRenderer`                                                                                    | no                       |
-| `apply.js`     | `applyConfig`, `isApplicable`, `GEOMETRY_KEYS`, `VIEWS`                                             | no                       |
+| `apply.js`     | `applyConfig`, `currentValue`, `isApplicable`, `GEOMETRY_KEYS`, `VIEWS`                                             | no                       |
 | `options.js`   | `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions`, `preset`, the three default sets | no                       |
 | `states.js`    | `collectStates`, `currentStates`, `restoreStates`, `statesToRestore`                                | no                       |
 | `notify.js`    | `createNotifier`, `EVENT_KEYS`                                                                      | no                       |
@@ -662,17 +662,21 @@ Three value translations live in this host's `comms.py`, because they are betwee
 | core module    | used by the widget                                                                                                   |
 | -------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `options.js`   | yes — `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions`                                              |
-| `apply.js`     | yes — `applyConfig`, for the zebra and studio families                                                               |
+| `apply.js`     | yes — `applyConfig`, for every setting the viewer can be told                                                               |
 | `animation.js` | yes — `addAnimationTrack`, `animate`                                                                                 |
 | `page.js`      | no — there is no page                                                                                                |
-| `render.js`    | **not yet** — the widget keeps its own copy of the camera policy; to be adopted                                      |
+| `render.js`    | yes — `createRenderer`, since the widget gave up its own camera policy                                      |
 | `notify.js`    | no — `handleNotification` writes traits directly                                                                     |
 | `states.js`    | no                                                                                                                   |
 | `logo.js`      | not yet — `jupyter_cadquery/logo.py` still carries its own tessellated splash, which is retired and awaiting removal |
 
 `TRAIT_TO_OPTION` is the one place this host's spelling is translated: `traitsAsConfig()` reads every trait and returns a config in renderer names, and everything below that works in renderer names as the shared code does. `getDisplayOptions` passes the core's builder its own overrides — `pinning`, the tool flags, `studioTool: true` where a panel has none — and the geometry, because a sidecar is sized by its caller.
 
-`handle_change` routes the sixteen `RUNTIME_SETTERS` keys through `applyConfig`, translating the one key first. The remaining 43 cases are still a hand-written switch: each reads a getter, compares with `isTolEqual` and sets only on a difference. `applyConfig`'s `accept` hook exists for exactly that, but it needs a getter per key, and this file keeps them inline in each case. **That, and `createRenderer`, are what this host has not yet taken** — see the open list for what each would cost.
+`handle_change` routes **every** viewer setting through `applyConfig`, and keeps only six cases of its own — the ipywidgets lifecycle plus `tracks`, `state_updates` and `measure`. The "set only on a difference" behaviour its forty-odd cases used to hand-write is the `accept` hook, answered by the core's `currentValue`; a key the viewer cannot be asked returns `undefined`, which reads as "apply it" — exactly what those cases did for `glass`, `explode` and the studio family, none of which was ever compared.
+
+Which traits go that way is **derived, not listed**: `APPLIED_TRAITS` filters the trait table through `isApplicable`, so a setter added to the core arrives here without anyone remembering. The hand-written list it replaced held the zebra and studio families and nothing else — because those happened to be the two added most recently — and `up`, `theme` and `reset_camera` were declared, mapped, and heard by nobody until it stopped being hand-written.
+
+The same two lists register the change listeners, in one loop where there were forty-five lines.
 
 The other direction is `handleNotification`, which maps three-cad-viewer's notification keys onto traitlets — `NOTIFICATION_TRAITS` names the ones that have a Python counterpart, and `collapse` is reverse-mapped to its letter. From there ipywidgets syncs the trait back to the kernel over its comm, which is how `viewer.status()` can answer `send_command("status")` without touching the browser.
 
@@ -692,38 +696,21 @@ Settled, and not to be re-opened:
 - **The show signature is the superset** of every host's parameters; each host acts on its own and refuses the rest by name through `exclude_keys`.
 - **Bound methods** are the API shape, for the completion reason measured above.
 - **`apply_defaults` is kept** in `ocp_tessellate`, with its NaN fix.
-- **There is one splash, and it is the viewer's.** Not one per host: a logo is built for the viewer, and every client shows that one. Jupyter CadQuery's own logo is retired.
+- **There is one splash, and it is the viewer's.** Not one per host: a logo is built for the viewer, and every client shows that one. Jupyter CadQuery's own logo is retired — and was already gone in the sense that mattered, since `jupyter_cadquery/logo.py` holds the same two shapes, `OCP` and `Eye`, that the core's does. What remains is that the same geometry is written down twice: once in `js/src/logo.js` with a camelCase config for the JavaScript path, once in `jupyter_cadquery/logo.py` with a snake_case config for the Python path. Both spellings are right for their side, and moving the Python copy into the core would put 200 kB in every host's wheel to serve the one host that pushes its splash through Python. So it stays.
 - **The measurement backend has no transport.** `ViewerBackend()` computes and returns; whoever drove it sends, on the channel it already held. `Comms` is a client transport and only that — every method on it exists because the core has to initiate something. The four flows this produces are documented above and are worth reading before touching any of them.
 - **`theme` is an ordinary config key and no host excludes it.** It was open on the argument that a surface decides its own; it does not — every host stores a theme setting, all three accept `"browser"` to mean "follow the surface", and the renderer takes it as an option like any other. It is in `SETTABLE` and `apply.js` calls `setTheme`, so it can also be changed on a live viewer.
 - **`dark` is gone.** A boolean that three-cad-viewer never took, superseded by `theme` in September 2025 and dead on the wire from that day, because each host converted it before answering a config request. It survived in the vocabulary for another year — which is what a key nothing produces costs: nothing, until something checks. Removing it also deleted two defects that sat on its unreachable branch in `_convert`: `dark=False` set the theme to `"dark"`, and an `elif` meant a config carrying `dark` skipped the `orbit_control` → `control` conversion entirely.
 - **`control` and `mate_scale` are unknown keywords**, not deprecated spellings. `control` had been deprecated for several releases and was accepted only by `show`, where `show_object`, `show_objects` and `set_defaults` already raised `TypeError` — so removing it made all four agree.
 
-Open — three pieces of work:
+Open — one piece of work, and it is not a small one:
 
-**To do: retire Jupyter CadQuery's splash.** `jupyter_cadquery/logo.py` still carries 196 kB of its own tessellated logo, and `open_viewer` draws it — while handing the measurement backend the _core's_ logo. So in a sidecar today, the splash you see is not the splash you can measure. Retiring it closes that as a side effect. Two routes: draw it in JavaScript, since `cad-viewer-widget` already bundles the core and `logo` is already exported there — one copy of the payload, and `open_viewer` loses its `add_shapes` call; or ship the tessellated splash from the core's Python beside the BREP, which is the smaller diff and ~200 kB more in the wheel.
+**Upstream in three-cad-viewer: three notification names are camelCase where every other one is snake_case.** `STATE_TO_NOTIFICATION_KEY` renames 36 of its 47 entries into the names Python knows — `blackEdges` → `black_edges`, `edgeColor` → `default_edgecolor`. But a few values are pushed straight into `checkChanges` from `select.ts`, `measure.ts`, `display.ts` and `viewer.ts`, bypassing that map. Most are single words and so are consistent by accident; three are not: **`selectedShapeIDs`, `activeTool` and `lastPick`**. So a status dict arrives at Python snake_case for everything except those, and `backend.py`'s `changes["activeTool"]` is the only camelCase literal in the Python half.
 
-**To do: finish cad-viewer-widget's adoption — `createRenderer` and the setter dispatch, and they share a prerequisite.**
+**It cannot be a patch release.** It changes what the renderer puts on the wire, and hosts align on three-cad-viewer's major.minor — so it forces 5.1.0 and a release of all four hosts with it. That is the real cost; the diff is small. Two traps if it is ever done: `activeTool` is *also* a `ViewerState` key that `apply.js` reads, so only the notification spelling may move; and all three are `cad_viewer_widget` traitlets, two with `@observe` handlers that put the same spelling in the body of an HTTP request.
 
-Its 43 `handle_change` cases split three ways: **28** already name a key `applyConfig` handles and could route through it today; **9** are keys `applyConfig` handles but which have **no entry in the widget's `TRAIT_TO_OPTION`** — `position`, `quaternion`, `target`, `zoom`, `explode`, `tab`, `cad_width`, `tree_width`, `height`, all read straight off the model instead (`reset_camera` is a tenth gap in that table, though not a `handle_change` case); and **6** are genuinely this host's and stay in the switch — `pinning`, `tracks`, `state_updates`, `debug`, `disposed`, `measure`.
+Nothing is broken by it. It is a consistency debt, parked deliberately.
 
-Those 9 are also what blocks `createRenderer`, which is why the two jobs are one job. `traitsAsConfig()` iterates `Object.keys(TRAIT_TO_OPTION)`, so a trait absent from that table is not read at all — the config the shared renderer would be handed today carries none of the keys it steers by. **Filling the table is step one for both.**
-
-The deeper obstacle is that `createRenderer` is built on `config` and `status` being two _different_ sources — what this show asked for, and what the viewer last reported — and its whole keep/center policy is `if (config.position) … else if (status.position)`. In this host the two collapse: `handleNotification` writes `position`, `quaternion`, `target` and `zoom` back into the same traits `add_shapes` sets, so feeding it traits for both would make the `else if` unreachable and turn `keep` into "reuse the previous camera verbatim", which is exactly what `keep` must not mean. The widget already knows this: `this._position`, `_quaternion`, `_target`, `_zoom` and `_camera_distance` are kept apart from the traits for that reason. **They are its private `status` under another name**, which is what makes the adoption a rename rather than a redesign — collect them into one object under the core's key names, and hand that in.
-
-The rest is splitting `addShapes()`: the ipywidgets business before `viewer.render` stays, the camera block becomes `renderer.render()`, and `sendStatus` becomes the four `model.set` plus `save_changes()`.
-
-**None of this changes anything for the other two clients.** The setters and the renderer are shared already; the only core-side addition is a key-to-getter table for `applyConfig`'s `accept` hook, which a host that does not pass `accept` never reaches.
-
-And the widget's private copy of the camera policy has a defect the shared one does not: in the `keep`/`center` branch, `viewerOptions.position = p` sits _outside_ the `if (model.get("position")) … else if (this._position) …`, so an explicit `position=` is assigned and then immediately overwritten with an unassigned `var` — and by `options.js`'s own rule, an option that is present and `undefined` resets what it names. It predates the core adoption, so it is not migration damage; adopting `createRenderer` is what removes it.
-
-**To do, upstream in three-cad-viewer: make the notification names consistent.** Four keys reach Python without passing through `STATE_TO_NOTIFICATION_KEY` — `selected` (from `select.ts`), `selectedShapeIDs` (from `measure.ts`), `activeTool` (from `display.ts`) and `lastPick` (from `viewer.ts`) — each pushed straight into `checkChanges`. `selected` and `states` are single words and are already consistent; the three that are not are `selectedShapeIDs`, `activeTool` and `lastPick`.
-
-Making them `selected_shape_ids`, `active_tool` and `last_pick` is contained — every consumer is ours — but it touches four repos at once and has two traps:
-
-- **`activeTool` is two things.** It is a `ViewerState` key _and_ a notification name. Only the notification spelling may change; `state.get("activeTool")` is the runtime acceptance gate and is what `apply.js` reads. And the notification must **not** become `analysis_tool`: that name is already a config key in every host's `WORKSPACE_CONFIG_KEYS`, so it would start being merged into the next show's config by `combined_config` — which is not what an event key is for.
-- **The names are `cad_viewer_widget` traitlets**, so a rename is an API change there: `lastPick`, `activeTool` and `selectedShapeIDs` are declared traits, two of them with `@observe` handlers that post the same camelCase spelling in the body of the HTTP request to the measurement backend. `lastPick` is the mildest — `CadViewer.last_pick` is already the public property in front of it.
-
-The choke point is `ocp_viewer_core/backend.py`, which reads `changes["activeTool"]` and `changes["selectedShapeIDs"]` for **both** transports — the websocket hosts and Jupyter CadQuery's HTTP one — so it changes once and serves all three.
+**A related idea, never decided:** `NOTIFICATION_TRAITS` in cad-viewer-widget is a hand-written list of 53 names, where `ViewerState.getAllNotifiable()` would answer the same question at runtime and cannot drift. It would also pick up the three the list silently drops — `holroyd`, `relative_time` and `selected`, the last being what both page hosts copy to the clipboard. It belongs with the rename if that ever happens.
 
 ---
 
