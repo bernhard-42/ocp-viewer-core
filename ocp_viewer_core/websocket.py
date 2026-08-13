@@ -316,7 +316,17 @@ class WebSocketComms(Comms[None]):
             return None
 
     def listener(self, callback):
-        """Listen for data from the viewer"""
+        """Drive a measurement backend from this viewer's notifications.
+
+        `callback` is `ViewerBackend.handle_event`, which computes and returns
+        rather than sending - so delivering its answer is this loop's job, and
+        this loop is the thing that has a connection to deliver it on.
+
+        Delivered with `_send`, which opens a connection of its own, rather than
+        on the socket held open here. Both reach the same server and the same
+        handler; using `_send` keeps this a pure move of the line that used to
+        sit inside the backend.
+        """
 
         def _listen():
             last_config = {}
@@ -340,7 +350,12 @@ class WebSocketComms(Comms[None]):
                                     continue
                                 new_changes[k] = v
                             last_config = changes
-                            callback(new_changes, MessageType.UPDATES)
+                            response = callback(new_changes, MessageType.UPDATES)
+                            # None is the common case by far: every change set
+                            # with no active tool, no selection, or a selection
+                            # the active tool cannot use.
+                            if response is not None:
+                                self._send(response, MessageType.BACKEND_RESPONSE)
 
                         elif message.get("command") == "stop":
                             print("Stopping Python listener")
@@ -372,8 +387,8 @@ class WebSocketComms(Comms[None]):
             else:
                 print("Jupyter kernel not responding")
 
-    # The five the contract asks for, and the sixth that listens. Each is one
-    # line because the framing is `_send`'s and the vocabulary is MessageType's.
+    # The four the contract asks for. Each is one line because the framing is
+    # `_send`'s and the vocabulary is MessageType's.
 
     @property
     def call_port(self):
@@ -401,9 +416,3 @@ class WebSocketComms(Comms[None]):
 
     def send_backend(self, data, timeit: bool = False) -> None:
         self._send(data, MessageType.BACKEND, self.call_port, timeit)
-
-    def send_response(self, data, timeit: bool = False) -> None:
-        self._send(data, MessageType.BACKEND_RESPONSE, self.call_port, timeit)
-
-    def listen(self, callback) -> None:
-        self.listener(callback)()

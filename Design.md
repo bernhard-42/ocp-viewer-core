@@ -6,12 +6,12 @@ It is one project published to two registries under one version: `ocp-viewer-cor
 
 The four hosts, and where each stands:
 
-| host | package | adopted |
-| --- | --- | --- |
-| OCP CAD Viewer for VS Code | `ocp_vscode` + the extension | yes, on branch `viewer-core` |
-| the standalone viewer | `ocp_viewer` | yes, it was written against the core |
-| Jupyter CadQuery | `jupyter_cadquery` + `cad_viewer_widget` | yes, on branch `viewer-core` in both |
-| build123d Studio | — | not yet |
+| host                       | package                                  | adopted                              |
+| -------------------------- | ---------------------------------------- | ------------------------------------ |
+| OCP CAD Viewer for VS Code | `ocp_vscode` + the extension             | yes, on branch `viewer-core`         |
+| the standalone viewer      | `ocp_viewer`                             | yes, it was written against the core |
+| Jupyter CadQuery           | `jupyter_cadquery` + `cad_viewer_widget` | yes, on branch `viewer-core` in both |
+| build123d Studio           | —                                        | not yet                              |
 
 ## The one rule everything follows
 
@@ -50,23 +50,23 @@ set_defaults, get_defaults, reset_defaults = config.set_defaults, config.get_def
 
 ### `Comms` — the transport
 
-`ocp_viewer_core/comms.py`. Five ways to send, one to listen, one to test a handle, one hook to encode, and a pair that carries the call's keywords.
+`ocp_viewer_core/comms.py`. Four ways to send, one hook to encode, one test for a handle, and a pair that carries the call's keywords.
 
-| method | what it must do | default |
-| --- | --- | --- |
-| `send_data(data, timeit)` | send a model, return this host's handle for it | raises |
-| `send_config(config, timeit)` | send a config block to the viewer | raises |
-| `send_command(data, timeit)` | send a command and return the viewer's answer | raises |
-| `send_backend(data, timeit)` | send to the measurement backend | raises |
-| `send_response(data, timeit)` | answer a request from the viewer | raises |
-| `encode_config(config)` | put a config block into the names this host's viewer reads | `keys.to_javascript` |
-| `listen(callback)` | take messages from the viewer until it stops | raises |
-| `is_handle(obj)` | whether `obj` is this host's viewer handle | `False` |
-| `begin(keywords)` / `end()` | the keywords of the call in flight | store / clear |
+**`Comms` is a client transport and only that.** Every method on it exists because _the core has to initiate something_: a show sends a model, a config or a command; a session asks the viewer two questions. Where the core is instead answering someone who reached in — which is the whole of the measurement backend — no method is needed, and there is none. That is the rule the whole file follows, and the backend section below is what it looks like applied.
 
-The five senders **raise `NotImplementedError` rather than having a docstring for a body**, and that is deliberate twice over. A body of only a docstring types as returning `None`, which contradicts `send_data`'s promise of a handle and spreads — `Session.workspace_config()` would be typed `None`, and `get_defaults()` would end up calling `dict(None)`. It is also the right runtime behaviour: a host that omits one should fail rather than silently send nothing.
+| method                        | what it must do                                            | default              |
+| ----------------------------- | ---------------------------------------------------------- | -------------------- |
+| `send_data(data, timeit)`     | send a model, return this host's handle for it             | raises               |
+| `send_config(config, timeit)` | send a config block to the viewer                          | raises               |
+| `send_command(data, timeit)`  | send a command and return the viewer's answer              | raises               |
+| `send_backend(data, timeit)`  | send to the measurement backend                            | raises               |
+| `encode_config(config)`       | put a config block into the names this host's viewer reads | `keys.to_javascript` |
+| `is_handle(obj)`              | whether `obj` is this host's viewer handle                 | `False`              |
+| `begin(keywords)` / `end()`   | the keywords of the call in flight                         | store / clear        |
 
-The last four have working defaults, because not every host needs them. Jupyter CadQuery answers in-process and never listens; a host with no handle need not test for one.
+The four senders **raise `NotImplementedError` rather than having a docstring for a body**, and that is deliberate twice over. A body of only a docstring types as returning `None`, which contradicts `send_data`'s promise of a handle and spreads — `Session.workspace_config()` would be typed `None`, and `get_defaults()` would end up calling `dict(None)`. It is also the right runtime behaviour: a host that omits one should fail rather than silently send nothing.
+
+The last four have working defaults, because not every host needs them: a host with no handle need not test for one, and every host gets the keyword scope whether or not it reads it.
 
 **`H` is the handle type.** `Comms` and `Viewer` are generic in it, so one `show` definition gives Jupyter CadQuery's users `CadWidget | None` and ocp_vscode's users plain `None`, each with correct completion on the result.
 
@@ -124,7 +124,7 @@ workspace config          (what the host stores)
 
 `DEFAULT_DEFAULTS` is module level and copied per instance, so construction and `reset_defaults()` read one source rather than two literals that drift.
 
-The enums live here too — `Camera`, `Collapse`, `Render`, `AnalysisTool`, `UiTab` and the five `Studio*` families. **Their values are already what the receiver expects**: `Collapse`'s numbers are three-cad-viewer's `CollapseState`, `Camera`'s and `UiTab`'s are the strings it takes. So unwrapping the enum is the whole of the translation, and `set_viewer_config` unwraps *every* argument that is an `Enum` rather than consulting a list of names — the list was six long and `reset_camera` was not on it, so `set_viewer_config(reset_camera=Camera.KEEP)` used to put an enum object on the wire.
+The enums live here too — `Camera`, `Collapse`, `Render`, `AnalysisTool`, `UiTab` and the five `Studio*` families. **Their values are already what the receiver expects**: `Collapse`'s numbers are three-cad-viewer's `CollapseState`, `Camera`'s and `UiTab`'s are the strings it takes. So unwrapping the enum is the whole of the translation, and `set_viewer_config` unwraps _every_ argument that is an `Enum` rather than consulting a list of names — the list was six long and `reset_camera` was not on it, so `set_viewer_config(reset_camera=Camera.KEEP)` used to put an enum object on the wire.
 
 ### `keys.py` — the vocabulary
 
@@ -166,18 +166,18 @@ Warnings are deliberately module-level rather than instance state: `warnings` is
 
 ### The modules beside the pipeline
 
-| module | what it is | reaches OCP |
-| --- | --- | --- |
-| `comms.py` | the transport contract, `Session`, `MessageType` | no |
-| `config.py` | defaults, precedence, enums | no |
-| `keys.py` | the key vocabulary | no |
-| `state.py` | the registry of running viewers, `~/.ocpvscode` | no |
-| `websocket.py` | the websocket client every socket host uses | no |
-| `show.py` | the show pipeline | yes |
-| `backend.py` | the measurement backend | yes |
-| `measure.py` | the OCCT measurements themselves | yes |
-| `colors.py` | the colour catalogue and `BaseColorMap` | no |
-| `logo.py` | the splash as measurable BREP | no |
+| module         | what it is                                       | reaches OCP |
+| -------------- | ------------------------------------------------ | ----------- |
+| `comms.py`     | the transport contract, `Session`, `MessageType` | no          |
+| `config.py`    | defaults, precedence, enums                      | no          |
+| `keys.py`      | the key vocabulary                               | no          |
+| `state.py`     | the registry of running viewers, `~/.ocpvscode`  | no          |
+| `websocket.py` | the websocket client every socket host uses      | no          |
+| `show.py`      | the show pipeline                                | yes         |
+| `backend.py`   | the measurement backend                          | yes         |
+| `measure.py`   | the OCCT measurements themselves                 | yes         |
+| `colors.py`    | the colour catalogue and `BaseColorMap`          | no          |
+| `logo.py`      | the splash as measurable BREP                    | no          |
 
 **`__init__.py` imports nothing but the version.** A host imports the submodule it needs, so importing the package never loads the tessellator or OCP. That is also a detectable property rather than a promise: if the config merge or the transport contract could not import without geometry, the layer would have leaked and the import graph would say so.
 
@@ -185,7 +185,7 @@ Warnings are deliberately module-level rather than instance state: `warnings` is
 
 **`websocket.py` is one implementation of `Comms`, not the contract.** ocp_vscode and ocp_viewer both talk to a viewer over the same protocol and both use it; build123d Studio sends length-prefixed binary frames over a local socket and will implement `Comms` directly. The port is instance state rather than a module global, so two clients in one process address two viewers, and discovery is lazy: reading the state file, probing what it finds and possibly asking the user which viewer they meant should not happen because somebody imported a module.
 
-**`backend.py` takes a transport rather than a port.** `ViewerBackend(comms)` — which viewer it answers, and how, is the host's business. The `jcv_id` parameter Jupyter CadQuery used to thread through it disappeared: it named the widget a response belonged to, which an injected `Comms` holds without anybody being told about widgets. It loads the logo at start, so the splash is measurable before any model has been sent.
+**`backend.py` takes nothing at all.** `ViewerBackend()` holds a model and an active tool, and `handle_event` **returns** the measurement rather than sending it. Why, and what each host does with that return, is the section below. It loads the logo at start, so the splash is measurable before any model has been sent.
 
 **`state.py` keeps a host's name for a good reason.** `~/.ocpvscode` is written by the VS Code extension in TypeScript and read by every Python client to find a viewer; renaming it would strand every installation that already has one. What moved into the core is the fact that it is not one host's — a standalone registers in it too, and a client discovers any viewer through it.
 
@@ -195,16 +195,16 @@ Warnings are deliberately module-level rather than instance state: `warnings` is
 
 `js/src/`, published to npm, `three-cad-viewer` as a peer dependency with a major.minor floor. Plain ES modules, no build step of its own — each host consumes the source and bundles or serves it its own way.
 
-| module | export | touches the DOM |
-| --- | --- | --- |
-| `page.js` | `createPage` | **yes — it is the page** |
-| `render.js` | `createRenderer` | no |
-| `apply.js` | `applyConfig`, `isApplicable`, `GEOMETRY_KEYS`, `VIEWS` | no |
-| `options.js` | `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions`, `preset`, the three default sets | no |
-| `states.js` | `collectStates`, `currentStates`, `restoreStates`, `statesToRestore` | no |
-| `notify.js` | `createNotifier`, `EVENT_KEYS` | no |
-| `animation.js` | `addAnimationTrack`, `animate`, `animationDuration` | no |
-| `logo.js` | `logo` | no |
+| module         | export                                                                                              | touches the DOM          |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------ |
+| `page.js`      | `createPage`                                                                                        | **yes — it is the page** |
+| `render.js`    | `createRenderer`                                                                                    | no                       |
+| `apply.js`     | `applyConfig`, `isApplicable`, `GEOMETRY_KEYS`, `VIEWS`                                             | no                       |
+| `options.js`   | `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions`, `preset`, the three default sets | no                       |
+| `states.js`    | `collectStates`, `currentStates`, `restoreStates`, `statesToRestore`                                | no                       |
+| `notify.js`    | `createNotifier`, `EVENT_KEYS`                                                                      | no                       |
+| `animation.js` | `addAnimationTrack`, `animate`, `animationDuration`                                                 | no                       |
+| `logo.js`      | `logo`                                                                                              | no                       |
 
 Everything but `page.js` takes a three-cad-viewer instance and plain data, and can be tested headless against a stub viewer. That distinction is worth keeping: new DOM work belongs in `page.js` or in a host, not spread through the others.
 
@@ -216,10 +216,12 @@ A host that shows a page in a browser-like surface calls `createPage` and suppli
 
 ```js
 const page = createPage({
-  Viewer, Display, Timer,   // three-cad-viewer's three — only the host knows where it loaded them from
-  send,                     // (command, message) => void — the host's channel to Python
-  overrides,                // { display, viewer } — only what this host genuinely differs on
-  theme                     // the host's resolved theme
+  Viewer,
+  Display,
+  Timer, // three-cad-viewer's three — only the host knows where it loaded them from
+  send, // (command, message) => void — the host's channel to Python
+  overrides, // { display, viewer } — only what this host genuinely differs on
+  theme, // the host's resolved theme
 });
 // → { showSplash(config), setTheme(next) }
 ```
@@ -234,7 +236,7 @@ Both page hosts deliver messages as a `message` event: the extension posts into 
 
 The part that was hardest to get right, and the part every client must agree on. Three modes, and the names understate the difference:
 
-- **`keep`** — the camera *direction* survives; the distance is recomputed from the new bounding box, and the zoom is corrected by how much that distance moved. Not "leave the camera alone": a model ten times larger, left alone, is off screen.
+- **`keep`** — the camera _direction_ survives; the distance is recomputed from the new bounding box, and the zoom is corrected by how much that distance moved. Not "leave the camera alone": a model ten times larger, left alone, is off screen.
 - **`center`** — the direction survives and the target moves to the new centre.
 - **`reset`, and the preset views** — the stored state is discarded. `reset` is `setView("iso")` plus a resize.
 
@@ -257,7 +259,7 @@ Four hooks let one dispatch serve hosts that differ:
 
 `states` is batched on purpose: a per-key `setState` loop over a large model is one repaint per key and freezes the host. Paths absent from the current model are dropped, because a state map outlives the model it was taken from.
 
-**Unifying this dispatch is a gain in capability, not a like-for-like move.** ocp_vscode accepts all eleven `studio_*` keys through `set_viewer_config` and had no branch for any of them, so sending one posted a message the viewer dropped without a word. cad-viewer-widget has always carried them. Sharing the table closes that by construction.
+**Unifying this dispatch is a gain in capability, not a like-for-like move.** ocp*vscode accepts all eleven `studio*\*`keys through`set_viewer_config` and had no branch for any of them, so sending one posted a message the viewer dropped without a word. cad-viewer-widget has always carried them. Sharing the table closes that by construction.
 
 ## `options.js` — the three option objects, and their defaults
 
@@ -268,7 +270,7 @@ three-cad-viewer takes options in three places: `new Display(container, options)
 Two details that cost real bugs:
 
 - **`preset` tests against `null`, not truthiness.** `null` and `undefined` both mean "not given" — a host sending an explicit null is asking for the default. Every other falsy value (`false`, `0`, `""`) is a value the caller meant. Getting that wrong turns `axes: false` into `axes: true` wherever the default is on.
-- **A key nobody has a value for is left out rather than passed as `undefined`.** The two are not the same to the renderer: an option that is *present* is applied, and applying `undefined` resets whatever it names — which for a camera key means the viewer reports `null` back, and a host whose settings are typed refuses it. This matters most for a host whose config comes from what a user set rather than from a stored workspace, where most keys are legitimately absent.
+- **A key nobody has a value for is left out rather than passed as `undefined`.** The two are not the same to the renderer: an option that is _present_ is applied, and applying `undefined` resets whatever it names — which for a camera key means the viewer reports `null` back, and a host whose settings are typed refuses it. This matters most for a host whose config comes from what a user set rather than from a stored workspace, where most keys are legitimately absent.
 
 `theme` is `"light"`, `"dark"` or `"browser"` and is passed straight through — one word in both languages, with the renderer resolving `"browser"` itself. The boolean `dark` it replaced is gone from the vocabulary; see the settled list below.
 
@@ -276,9 +278,9 @@ Two details that cost real bugs:
 
 three-cad-viewer calls a notification callback with `{key: {old, new}}`. `createNotifier` turns that into the message a host sends, and keeps a running picture so a host can answer `status()` out of memory instead of asking the browser.
 
-**What goes on the wire is the delta, not the accumulated snapshot.** `EVENT_KEYS` — `selectedShapeIDs`, `selected`, `lastPick`, `activeTool`, `relative_time` — report that something *happened* as opposed to what something *is*, and must never be accumulated: an accumulated `selectedShapeIDs` replays a selection the user made minutes ago into the next measurement, against a model that may not even contain those ids. The distinction is not "does it change often"; it is whether re-applying the last value to a different model still means anything.
+**What goes on the wire is the delta, not the accumulated snapshot.** `EVENT_KEYS` — `selectedShapeIDs`, `selected`, `lastPick`, `activeTool`, `relative_time` — report that something _happened_ as opposed to what something _is_, and must never be accumulated: an accumulated `selectedShapeIDs` replays a selection the user made minutes ago into the next measurement, against a model that may not even contain those ids. The distinction is not "does it change often"; it is whether re-applying the last value to a different model still means anything.
 
-The accumulated picture still exists as `status`, holding state keys only, and `page.js` sends `{...status, ...delta}` — because the VS Code extension answers a status request with the *last* message the webview sent, replacing rather than merging, so a bare delta would lose every earlier value.
+The accumulated picture still exists as `status`, holding state keys only, and `page.js` sends `{...status, ...delta}` — because the VS Code extension answers a status request with the _last_ message the webview sent, replacing rather than merging, so a bare delta would lose every earlier value.
 
 **Names on the way back are the renderer's own notification names, which are snake_case.** Nothing is translated coming back: the renderer already emits what Python speaks. The camelCase conversion is one-directional by the renderer's choice, not by ours.
 
@@ -304,17 +306,19 @@ The config was converted to renderer names once, on the way in, so each host's a
 
 `MessageType` is the shared vocabulary and lives with the transport contract, because it is the protocol rather than any one implementation of it:
 
-| | value | direction | carries |
-| --- | --- | --- | --- |
-| `DATA` | 1 | Python → viewer | a model |
-| `COMMAND` | 2 | Python → viewer, with a reply | `"status"`, `"config"`, screenshot, relative time |
-| `UPDATES` | 3 | viewer → Python | what changed in the viewer |
-| `LISTEN` | 4 | a receiver → the host | register to be sent things |
-| `BACKEND` | 5 | Python → backend | the id-to-shape mapping of the model just drawn |
-| `BACKEND_RESPONSE` | 6 | backend → viewer | a measurement result |
-| `CONFIG` | 7 | Python → viewer | a `ui` config block |
+|                    | value | direction                     | carries                                           |
+| ------------------ | ----- | ----------------------------- | ------------------------------------------------- |
+| `DATA`             | 1     | Python → viewer               | a model                                           |
+| `COMMAND`          | 2     | Python → viewer, with a reply | `"status"`, `"config"`, screenshot, relative time |
+| `UPDATES`          | 3     | viewer → Python               | what changed in the viewer                        |
+| `LISTEN`           | 4     | a receiver → the host         | register to be sent things                        |
+| `BACKEND`          | 5     | Python → backend              | the id-to-shape mapping of the model just drawn   |
+| `BACKEND_RESPONSE` | 6     | backend → viewer              | a measurement result                              |
+| `CONFIG`           | 7     | Python → viewer               | a `ui` config block                               |
 
-Hosts that speak over a socket spell these as a one-letter prefix — `D:`, `C:`, `U:`, `S:`, `L:`, `B:`, `R:` — and only the socket layer knows that; everything above works in objects. `WebSocketComms._send` frames five of them; `UPDATES` never goes out from Python, since it is what comes *back*, and it reaches `Comms.listen`'s callback as the discriminator between a new model and a change set. `LISTEN` is whoever wants to be sent things: ocp_vscode's measurement backend registers with it, and so does the standalone's browser.
+Hosts that speak over a socket spell these as a one-letter prefix — `D:`, `C:`, `U:`, `S:`, `L:`, `B:`, `R:` — and only the socket layer knows that; everything above works in objects.
+
+Four of the seven are on `Comms`, and they are the four the core initiates: `DATA`, `COMMAND`, `CONFIG`, `BACKEND`. The other three are not, and each for its own reason. `UPDATES` never goes out from Python at all — it is what comes _back_, and it reaches `listener`'s callback as the discriminator between a new model and a change set. `LISTEN` is whoever wants to be sent things, and it is sent by `listener` itself when it registers; ocp_vscode's measurement backend uses it, and so does the standalone's browser. `BACKEND_RESPONSE` is framed inside `listener` too, when the backend it drives hands back an answer — it is deliberately not a `Comms` method, because three of the four hosts have no use for one.
 
 The two reads a show makes:
 
@@ -325,9 +329,134 @@ The two reads a show makes:
 
 ---
 
+# The measurement backend, and the four ways an answer gets home
+
+This is the part that is hardest to hold in your head, because every host does it differently and the differences are all in the _plumbing around_ the shared code rather than in the shared code itself. So the shared part first, then each host end to end.
+
+## The shared part is one sentence
+
+**`ViewerBackend` answers by returning. It has no transport.**
+
+`handle_event(changes, message_type)` is given a change set and returns the measurement, or `None`. It returns `None` far more often than not: for every `DATA` message, and for any `UPDATES` where no tool is active, where `selectedShapeIDs` is absent, or where the selection does not match what the active tool needs — two ids and a shift for a distance, one for properties. **Every caller must check.**
+
+Why it has no transport: a change set only ever arrives because something already reached in — a socket message, an HTTP request, a line on a pipe. So whoever drove the backend already holds the channel the answer goes back on. Giving the backend its own would be a second route to a destination the caller can already reach, and every host demonstrated that: two ended up with a `send_response` that did nothing, one with a class of five methods where four were dead, and build123d Studio — which built the same thing independently, before any of this was shared — never gave its `Measurements` a transport at all.
+
+The response _always_ crosses from Python to JavaScript in the end. Nothing here removes a send; what it removes is the _core_ needing to know how that send is done.
+
+## The journey, in the abstract
+
+Every host runs the same five steps. Only steps 2 and 5 differ.
+
+1. the user picks shapes in the viewer, and three-cad-viewer notifies `selectedShapeIDs` / `activeTool`
+2. **the notification travels to some Python that holds the model** — this is where hosts diverge
+3. that Python calls `ViewerBackend.handle_event`
+4. the backend computes exact geometry from the BRep and **returns** it, or `None`
+5. **the receiver sends the answer back toward the viewer** on the channel it already had — this is where hosts diverge again
+
+## ocp_vscode — a listener process, answering on a second connection
+
+```
+viewer (webview JS)
+  └─ send("status", {activeTool, selectedShapeIDs, ...})
+      └─ vscode.postMessage
+          └─ extension: controller.ts onDidReceiveMessage
+              ├─ stores it as `viewer_message` (this is what a `status` command is answered from)
+              └─ pythonListener.send(...)          ← the socket that registered with `L:`
+                  └─ backend process: WebSocketComms.listener loop
+                      ├─ diffs against the previous notification
+                      ├─ callback = ViewerBackend.handle_event  → returns the answer or None
+                      └─ if not None: _send(answer, BACKEND_RESPONSE)   → `R:`
+                          └─ extension relays `R:` with postMessage
+                              └─ viewer.handleBackendResponse(data)
+```
+
+Three things about this one are easy to forget:
+
+- **The backend is its own process**, started by the extension as `python -m ocp_vscode --backend --port N` in a terminal. It is a websocket _client_, exactly as the user's script is.
+- **It receives everything, and filters.** The extension forwards _every_ webview message to the registered listener — including a `status` on every frame while the user orbits. `controller.ts` says so itself: _"status is dual-purpose: it carries camera updates (every frame while the user pans/orbits) AND click/tool events"_. The backend discards all of them where no tool is active.
+- **The answer does not go back on the socket it arrived on.** `listener` holds one connection open to receive; `_send` opens a fresh one to reply. Same port, same server, different connection.
+
+## ocp_viewer — one socket, both directions
+
+```
+viewer (browser JS)
+  └─ comms.js sendStatus  → `U:` on the browser's websocket
+      └─ server: sockets.handle → _update
+          ├─ records the socket as `viewer.browser`
+          ├─ viewer.record(changes)   (keeps the picture a `status` command is answered from)
+          ├─ pyperclip.copy(...) when `selected` is present
+          ├─ viewer.backend.handle_event(...)  → returns the answer or None
+          └─ if not None: _to_browser(orjson.dumps(answer).decode())
+              └─ same websocket, back to the page
+```
+
+- **The backend runs inside the Flask server**, not in the user's process. The user's `show()` is a _different_ process talking to this one over a _different_ websocket.
+- **The answer goes back on the same socket the notification arrived on** — the only host where that is true.
+- **It is the one message this server encodes.** Everything else `_update`'s sibling handlers touch is relayed exactly as it arrived, because a model is large and re-encoding it would cost a copy to learn nothing. A backend answer is a dict, so it is dumped — and _decoded to a string_, because bytes go out as a binary frame and arrive in the browser as a `Blob`, where the page's handler expects text.
+
+## jupyter_cadquery — an HTTP round trip, and then a traitlet
+
+The one with no socket anywhere, and the one whose direction is easiest to get backwards. **The kernel calls the server; the server answers.**
+
+```
+viewer (widget JS)
+  └─ handleNotification → model.set("selectedShapeIDs", ...)
+      └─ ipywidgets comm → kernel
+          └─ CadViewerWidget @observe("selectedShapeIDs")
+              └─ measure_callback = send_measure_request
+                  └─ HTTP POST /measure  →  Jupyter server extension
+                      └─ MeasureHandler.post
+                          ├─ BACKENDS[viewer_id].handle_event(...)  → answer or None
+                          └─ self.finish({"success": answer})       ← the send
+                  ←── the POST returns
+              └─ observer sets self.measure = answer
+          └─ ipywidgets comm → widget JS
+              └─ the measurement panel shows it
+```
+
+- **Three processes are involved**: the browser, the kernel, and the Jupyter server. The backend lives in the _server_, one per viewer id in `BACKENDS`, so several notebooks share the process and a kernel restart does not lose the indexed model.
+- **`finish()` is the send.** It is exactly what `send_response` is elsewhere — the difference is that HTTP owes exactly one reply per request whether or not the backend produced anything, which is why returning fits here and pushing does not.
+- **The answer takes two more hops after that**: the HTTP reply lands back in the kernel, which sets the `measure` traitlet, which ipywidgets syncs to the browser. So Python→JavaScript happens over the widget comm, not over the HTTP call.
+- The kernel's `JupyterComms` is not involved at any point in this path.
+
+## build123d Studio — a pipe to a process that must never start a thread
+
+Not yet adopted, and it already works this way — which is the strongest evidence the shape is right.
+
+```
+viewer (frontend JS)
+  └─ "viewer.changes" on the sidecar's websocket
+      └─ sidecar: main.py on_viewer_changes
+          └─ MeasurementService.handle_changes
+              └─ write a `changes` request to measure_process on stdin
+                  └─ measure_process.main loop
+                      ├─ answer() dispatches load / changes / ping
+                      └─ Measurements.handle_changes(...)  → answer or None
+                  ←── one reply written to stdout
+          └─ if not None: channel.send("viewer.response", response=answer)
+              └─ same websocket, back to the frontend
+```
+
+- **A fourth process, and for a specific reason**: importing OCP holds the Windows loader lock, so `measure_process` is written to never start a thread. Listening→ready went from 6.52 s to 1.80 s on Windows by moving it out of the sidecar.
+- `Measurements.handle_changes` mirrors `ViewerBackend.handle_event`'s UPDATES branch, including returning `None`, and its caller has the same `if response is not None` guard.
+- When this host adopts the core it needs a `StudioComms(Comms)` for the show path and **nothing at all** for the backend.
+
+## Reading the four together
+
+|                  | where the notification lands                   | what drives the backend        | how the answer is sent                 | processes |
+| ---------------- | ---------------------------------------------- | ------------------------------ | -------------------------------------- | --------- |
+| ocp_vscode       | the backend process, over a websocket          | `WebSocketComms.listener` loop | a _second_ websocket connection (`R:`) | 3         |
+| ocp_viewer       | the Flask server, over the browser's websocket | `sockets._update`              | the same websocket                     | 3         |
+| jupyter_cadquery | the Jupyter server, over HTTP                  | `MeasureHandler.post`          | the HTTP reply, then a traitlet        | 3         |
+| build123d Studio | the sidecar, over its websocket                | `main.on_viewer_changes`       | the same websocket                     | 4         |
+
+The column that matters is the third, and the pattern in it is: **the answer goes back the way the request came, on the channel the receiver already had.** That is the whole reason the backend does not need a transport — and the reason `Comms` has no `send_response`.
+
+---
+
 # Viewers
 
-Three hosts have adopted the core. Each supplies a `Comms` and two lists; the differences between them are entirely in *how a message gets to the viewer* and *how the JavaScript is loaded*.
+Three hosts have adopted the core. Each supplies a `Comms` and two lists; the differences between them are entirely in _how a message gets to the viewer_ and _how the JavaScript is loaded_.
 
 ## OCP CAD Viewer for VS Code — `ocp_vscode`
 
@@ -374,7 +503,7 @@ The small entry points — `status`, `workspace_config`, `combined_config`, `get
 
 **The `is_jupyter_cadquery` import branch is gone.** It decided at import time, from an environment variable, which transport the config functions would use — so `from ocp_vscode import config` behaved differently depending on a variable set somewhere else. A host supplying its own `Comms` is that decision made in one place, by the host, at construction.
 
-`ocp_vscode/colors.py` is a re-export of the core catalogue, kept so `from ocp_vscode.colors import ColorMap` still names something. `python -m ocp_vscode --backend --port N` is `ViewerBackend(comms)` and nothing else; run with no arguments it says where the standalone viewer went.
+`ocp_vscode/colors.py` is a re-export of the core catalogue, kept so `from ocp_vscode.colors import ColorMap` still names something. `python -m ocp_vscode --backend --port N` builds a `ViewerBackend()` and hands `handle_event` to `comms.listener`; run with no arguments it says where the standalone viewer went.
 
 Measured across the whole package, the Python went from **6,131 lines to 1,183**: `show.py` 1,745 → 88, `config.py` 866 → 246, `comms.py` 373 → 139, and six modules given up entirely — `backend.py`, `measure.py`, `state.py`, `backend_logo.py`, `standalone.py` and `standalone_defaults.py`, the last two having become `ocp_viewer`.
 
@@ -410,7 +539,7 @@ flowchart LR
   end
   subgraph srv["python -m ocp_viewer (Flask + flask_sock)"]
     H["sockets.handle"] --> VW["Viewer state"]
-    VW --> B["ViewerBackend (core)<br/>+ BrowserComms"]
+    VW --> B["ViewerBackend (core)"]
   end
   subgraph br["browser"]
     CJ["comms.js<br/>WebSocket → window.postMessage"] --> P["createPage (core)"] --> TCV["three-cad-viewer"]
@@ -424,12 +553,14 @@ flowchart LR
 
 **Two files called `comms.py`, facing opposite ways, and that is the clearest thing about this host.**
 
-- **`ocp_viewer/comms.py`** is the *client*: the core's `WebSocketComms`, unmodified — a bare instance, plus `set_port` / `get_port`. It dials out to a viewer and is told which one.
-- **`ocp_viewer/server/comms.py`** is the *server's*: `BrowserComms(Comms[None])`, which answers the browser already connected to it and has nothing to dial.
+- **`ocp_viewer/comms.py`** is the _client_: the core's `WebSocketComms`, unmodified — a bare instance, plus `set_port` / `get_port`. It dials out to a viewer and is told which one.
+- **`ocp_viewer/server/comms.py` is gone.** It held `BrowserComms`, whose one job was answering the browser — which `sockets._update` now does directly, since it is the code that holds that socket.
 
-`set_port` / `get_port` live with the client, because what they point is that one; the server's port is where it *listens* and is a startup setting rather than something a script chooses.
+`set_port` / `get_port` live with the client, because what they point is that one; the server's port is where it _listens_ and is a startup setting rather than something a script chooses.
 
-`BrowserComms` implements **only `send_response`**. The measurement backend is the one thing this host runs that talks *to* the browser; models, config and commands arrive from a user's Python process and are relayed by the socket handler, which has the message already encoded and no reason to decode it. It is built with the `Viewer` object rather than with a socket, so it asks *at send time* which socket is registered — a browser can refresh, and the socket it had is not the socket it has.
+So this package has **one** `Comms`, not two: `StandaloneComms`, the client. The measurement backend needs none — see the backend section above.
+
+A browser can refresh, and the socket it had is not the socket it has, so the answer is sent through `viewer.browser` read at send time rather than through a socket captured earlier.
 
 That response is **decoded to a string before sending**. Bytes go out as a binary frame and arrive in the browser as a `Blob`, and the page's socket handler reads what it is given as text — `event.data.substring is not a function` is what a Blob looks like from there. Every other message the browser receives is relayed as the string it arrived as, so this was the one that differed.
 
@@ -439,15 +570,14 @@ Identically to ocp_vscode: the same two lists (61 workspace keys, the same five 
 
 The server half is small and each piece has one job:
 
-| file | what |
-| --- | --- |
-| `server/__init__.py` | `create_app` / `serve` — the Flask app, the `Sock` route, the port registration |
-| `server/viewer.py` | `Viewer` — the running viewer's state: its two clients, its config, its status, `_splash` |
-| `server/sockets.py` | the one websocket, and the six message kinds on it |
-| `server/views.py` | the two HTTP routes: `/viewer` and a redirect to it |
-| `server/settings.py` | the settings a `C:"config"` is answered from |
-| `server/comms.py` | `BrowserComms` |
-| `server/screenshot.py`, `server/network.py` | saving a PNG data URL; the port-in-use check |
+| file                                        | what                                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `server/__init__.py`                        | `create_app` / `serve` — the Flask app, the `Sock` route, the port registration           |
+| `server/viewer.py`                          | `Viewer` — the running viewer's state: its two clients, its config, its status, `_splash` |
+| `server/sockets.py`                         | the one websocket, and the six message kinds on it                                        |
+| `server/views.py`                           | the two HTTP routes: `/viewer` and a redirect to it                                       |
+| `server/settings.py`                        | the settings a `C:"config"` is answered from                                              |
+| `server/screenshot.py`, `server/network.py` | saving a PNG data URL; the port-in-use check                                              |
 
 The viewer state is one object held in `app.extensions`, not module globals, so two viewers in one process are two viewers — the same defect the Python client side closed.
 
@@ -473,13 +603,13 @@ node_modules/three-cad-viewer/dist/*.css     → ocp_viewer/server/static/css/
 
 The channel to Python is `static/js/comms.js`, this host's own: a `WebSocket` back to the server that served the page, which **re-posts every message it receives as a `window.postMessage`**. That is what lets `createPage`'s single `message` listener serve both hosts unchanged — the extension posts into the webview, and here a socket shim posts what came off the wire. It also owns the reconnect loop and the "connection closed" banner, which is a browser-only concern.
 
-The splash is shown on load rather than when told to, because nothing is going to send this host one: it *is* the server.
+The splash is shown on load rather than when told to, because nothing is going to send this host one: it _is_ the server.
 
-The websocket address is taken from the *request*, not from how the server was started — a browser may have reached it by a hostname that is routable from where it is, and that is the address it must dial back.
+The websocket address is taken from the _request_, not from how the server was started — a browser may have reached it by a hostname that is routable from where it is, and that is the address it must dial back.
 
 ## Jupyter CadQuery — `jupyter_cadquery` + `cad_viewer_widget`
 
-The host least like the others, and the one that proves the core takes a *transport* rather than a socket. **There is no wire at all** on the show path: `send_data` builds an ipywidgets widget in the same process and hands it back.
+The host least like the others, and the one that proves the core takes a _transport_ rather than a socket. **There is no wire at all** on the show path: `send_data` builds an ipywidgets widget in the same process and hands it back.
 
 ```mermaid
 flowchart LR
@@ -492,7 +622,7 @@ flowchart LR
     W -. "applyConfig, build*Options,<br/>animation (core)" .-> CORE["ocp-viewer-core<br/>bundled by webpack"]
   end
   subgraph js["Jupyter server extension"]
-    B["ViewerBackend (core)<br/>+ ServerComms"]
+    B["ViewerBackend (core)"]
   end
   CV -- "ipywidgets comm<br/>(traitlet sync)" --> W
   C -- "HTTP POST /objects" --> B
@@ -508,7 +638,6 @@ flowchart LR
 - **`send_config`** sets attributes on the widget, skipping any property with no setter — `up` and `control` are chosen when the sidecar is opened, and `reset_defaults` re-applies everything the workspace config holds, so without the check it would raise on a key the viewer simply cannot change now. It asks the property whether it is settable rather than catching `AttributeError`, so a genuine failure inside a setter still surfaces.
 - **`send_command`** answers `"config"` from the user's stored defaults plus the sidecar's `_splash`, and `"status"` from `viewer.status()`; a screenshot command becomes `viewer.export_png`.
 - **`send_backend`** POSTs to the Jupyter server extension over HTTP, keyed by widget id.
-- **`send_response` does nothing at all**, and the docstring says why: `handle_properties` and `handle_distance` both *return* their response and call it, and where a socket host puts that on the wire, here the caller reads the return value.
 - **`is_handle`** is `isinstance(obj, CadViewer)` — this is the host where the user's namespace really does contain the viewer.
 - **`title`** reads `viewer` out of the keyword scope: which sidecar a call is addressed to, exactly the way a port works for the hosts that have one.
 
@@ -520,7 +649,7 @@ Three value translations live in this host's `comms.py`, because they are betwee
 
 **`EXCLUDE_KEYS` is `("port",)` — and it is the one that runs the other way.** `cad_width`, `height`, `viewer`, `anchor` and `pinning` are all this host's to be told, where a panel decides its own and refuses them; `port` names a viewer to address among several, which is real where viewers are servers and has no meaning in a notebook. The entry points take `viewer=` where the others take `port=`.
 
-**The measurement backend runs in a third place: the Jupyter server extension.** `jupyter_cadquery/app.py` registers `/objects` and `/measure` handlers, keeps one `ViewerBackend` per viewer id, and gives each a `ServerComms` whose every send is a no-op — the backend is *asked over HTTP* and the handler reads what `handle_properties` and `handle_distance` return, so it never sends anything and `listen` is never reached. The kernel's `JupyterComms` is deliberately not imported there: that half needs the widget, and this process has no notebook in it. The two transports for one backend, in two processes, are the sharpest illustration of why the core takes a transport.
+**The measurement backend runs in a third place: the Jupyter server extension.** `jupyter_cadquery/app.py` registers `/objects` and `/measure` handlers and keeps one `ViewerBackend` per viewer id. It is _asked over HTTP_ and the handler puts what `handle_event` returns into the reply it already owes — which is why this host needed no backend transport, and why it is now the reference the other three follow. The full path is in the backend section above.
 
 `jupyter_cadquery` no longer imports anything from `ocp_vscode`; it depends on `ocp-viewer-core` and `cad-viewer-widget` and nothing else of the ecosystem's Python.
 
@@ -530,16 +659,16 @@ Three value translations live in this host's `comms.py`, because they are betwee
 
 **This host takes the pieces, not the page**, which is the real difference from the other two:
 
-| core module | used by the widget |
-| --- | --- |
-| `options.js` | yes — `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions` |
-| `apply.js` | yes — `applyConfig`, for the zebra and studio families |
-| `animation.js` | yes — `addAnimationTrack`, `animate` |
-| `page.js` | no — there is no page |
-| `render.js` | **not yet** — the widget keeps its own copy of the camera policy; to be adopted |
-| `notify.js` | no — `handleNotification` writes traits directly |
-| `states.js` | no |
-| `logo.js` | not yet — `jupyter_cadquery/logo.py` still carries its own tessellated splash, which is retired and awaiting removal |
+| core module    | used by the widget                                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `options.js`   | yes — `buildDisplayOptions`, `buildRenderOptions`, `buildViewerOptions`                                              |
+| `apply.js`     | yes — `applyConfig`, for the zebra and studio families                                                               |
+| `animation.js` | yes — `addAnimationTrack`, `animate`                                                                                 |
+| `page.js`      | no — there is no page                                                                                                |
+| `render.js`    | **not yet** — the widget keeps its own copy of the camera policy; to be adopted                                      |
+| `notify.js`    | no — `handleNotification` writes traits directly                                                                     |
+| `states.js`    | no                                                                                                                   |
+| `logo.js`      | not yet — `jupyter_cadquery/logo.py` still carries its own tessellated splash, which is retired and awaiting removal |
 
 `TRAIT_TO_OPTION` is the one place this host's spelling is translated: `traitsAsConfig()` reads every trait and returns a config in renderer names, and everything below that works in renderer names as the shared code does. `getDisplayOptions` passes the core's builder its own overrides — `pinning`, the tool flags, `studioTool: true` where a panel has none — and the geometry, because a sidecar is sized by its caller.
 
@@ -564,13 +693,14 @@ Settled, and not to be re-opened:
 - **Bound methods** are the API shape, for the completion reason measured above.
 - **`apply_defaults` is kept** in `ocp_tessellate`, with its NaN fix.
 - **There is one splash, and it is the viewer's.** Not one per host: a logo is built for the viewer, and every client shows that one. Jupyter CadQuery's own logo is retired.
+- **The measurement backend has no transport.** `ViewerBackend()` computes and returns; whoever drove it sends, on the channel it already held. `Comms` is a client transport and only that — every method on it exists because the core has to initiate something. The four flows this produces are documented above and are worth reading before touching any of them.
 - **`theme` is an ordinary config key and no host excludes it.** It was open on the argument that a surface decides its own; it does not — every host stores a theme setting, all three accept `"browser"` to mean "follow the surface", and the renderer takes it as an option like any other. It is in `SETTABLE` and `apply.js` calls `setTheme`, so it can also be changed on a live viewer.
 - **`dark` is gone.** A boolean that three-cad-viewer never took, superseded by `theme` in September 2025 and dead on the wire from that day, because each host converted it before answering a config request. It survived in the vocabulary for another year — which is what a key nothing produces costs: nothing, until something checks. Removing it also deleted two defects that sat on its unreachable branch in `_convert`: `dark=False` set the theme to `"dark"`, and an `elif` meant a config carrying `dark` skipped the `orbit_control` → `control` conversion entirely.
 - **`control` and `mate_scale` are unknown keywords**, not deprecated spellings. `control` had been deprecated for several releases and was accepted only by `show`, where `show_object`, `show_objects` and `set_defaults` already raised `TypeError` — so removing it made all four agree.
 
 Open — three pieces of work:
 
-**To do: retire Jupyter CadQuery's splash.** `jupyter_cadquery/logo.py` still carries 196 kB of its own tessellated logo, and `open_viewer` draws it — while handing the measurement backend the *core's* logo. So in a sidecar today, the splash you see is not the splash you can measure. Retiring it closes that as a side effect. Two routes: draw it in JavaScript, since `cad-viewer-widget` already bundles the core and `logo` is already exported there — one copy of the payload, and `open_viewer` loses its `add_shapes` call; or ship the tessellated splash from the core's Python beside the BREP, which is the smaller diff and ~200 kB more in the wheel.
+**To do: retire Jupyter CadQuery's splash.** `jupyter_cadquery/logo.py` still carries 196 kB of its own tessellated logo, and `open_viewer` draws it — while handing the measurement backend the _core's_ logo. So in a sidecar today, the splash you see is not the splash you can measure. Retiring it closes that as a side effect. Two routes: draw it in JavaScript, since `cad-viewer-widget` already bundles the core and `logo` is already exported there — one copy of the payload, and `open_viewer` loses its `add_shapes` call; or ship the tessellated splash from the core's Python beside the BREP, which is the smaller diff and ~200 kB more in the wheel.
 
 **To do: finish cad-viewer-widget's adoption — `createRenderer` and the setter dispatch, and they share a prerequisite.**
 
@@ -578,19 +708,19 @@ Its 43 `handle_change` cases split three ways: **28** already name a key `applyC
 
 Those 9 are also what blocks `createRenderer`, which is why the two jobs are one job. `traitsAsConfig()` iterates `Object.keys(TRAIT_TO_OPTION)`, so a trait absent from that table is not read at all — the config the shared renderer would be handed today carries none of the keys it steers by. **Filling the table is step one for both.**
 
-The deeper obstacle is that `createRenderer` is built on `config` and `status` being two *different* sources — what this show asked for, and what the viewer last reported — and its whole keep/center policy is `if (config.position) … else if (status.position)`. In this host the two collapse: `handleNotification` writes `position`, `quaternion`, `target` and `zoom` back into the same traits `add_shapes` sets, so feeding it traits for both would make the `else if` unreachable and turn `keep` into "reuse the previous camera verbatim", which is exactly what `keep` must not mean. The widget already knows this: `this._position`, `_quaternion`, `_target`, `_zoom` and `_camera_distance` are kept apart from the traits for that reason. **They are its private `status` under another name**, which is what makes the adoption a rename rather than a redesign — collect them into one object under the core's key names, and hand that in.
+The deeper obstacle is that `createRenderer` is built on `config` and `status` being two _different_ sources — what this show asked for, and what the viewer last reported — and its whole keep/center policy is `if (config.position) … else if (status.position)`. In this host the two collapse: `handleNotification` writes `position`, `quaternion`, `target` and `zoom` back into the same traits `add_shapes` sets, so feeding it traits for both would make the `else if` unreachable and turn `keep` into "reuse the previous camera verbatim", which is exactly what `keep` must not mean. The widget already knows this: `this._position`, `_quaternion`, `_target`, `_zoom` and `_camera_distance` are kept apart from the traits for that reason. **They are its private `status` under another name**, which is what makes the adoption a rename rather than a redesign — collect them into one object under the core's key names, and hand that in.
 
 The rest is splitting `addShapes()`: the ipywidgets business before `viewer.render` stays, the camera block becomes `renderer.render()`, and `sendStatus` becomes the four `model.set` plus `save_changes()`.
 
 **None of this changes anything for the other two clients.** The setters and the renderer are shared already; the only core-side addition is a key-to-getter table for `applyConfig`'s `accept` hook, which a host that does not pass `accept` never reaches.
 
-And the widget's private copy of the camera policy has a defect the shared one does not: in the `keep`/`center` branch, `viewerOptions.position = p` sits *outside* the `if (model.get("position")) … else if (this._position) …`, so an explicit `position=` is assigned and then immediately overwritten with an unassigned `var` — and by `options.js`'s own rule, an option that is present and `undefined` resets what it names. It predates the core adoption, so it is not migration damage; adopting `createRenderer` is what removes it.
+And the widget's private copy of the camera policy has a defect the shared one does not: in the `keep`/`center` branch, `viewerOptions.position = p` sits _outside_ the `if (model.get("position")) … else if (this._position) …`, so an explicit `position=` is assigned and then immediately overwritten with an unassigned `var` — and by `options.js`'s own rule, an option that is present and `undefined` resets what it names. It predates the core adoption, so it is not migration damage; adopting `createRenderer` is what removes it.
 
 **To do, upstream in three-cad-viewer: make the notification names consistent.** Four keys reach Python without passing through `STATE_TO_NOTIFICATION_KEY` — `selected` (from `select.ts`), `selectedShapeIDs` (from `measure.ts`), `activeTool` (from `display.ts`) and `lastPick` (from `viewer.ts`) — each pushed straight into `checkChanges`. `selected` and `states` are single words and are already consistent; the three that are not are `selectedShapeIDs`, `activeTool` and `lastPick`.
 
 Making them `selected_shape_ids`, `active_tool` and `last_pick` is contained — every consumer is ours — but it touches four repos at once and has two traps:
 
-- **`activeTool` is two things.** It is a `ViewerState` key *and* a notification name. Only the notification spelling may change; `state.get("activeTool")` is the runtime acceptance gate and is what `apply.js` reads. And the notification must **not** become `analysis_tool`: that name is already a config key in every host's `WORKSPACE_CONFIG_KEYS`, so it would start being merged into the next show's config by `combined_config` — which is not what an event key is for.
+- **`activeTool` is two things.** It is a `ViewerState` key _and_ a notification name. Only the notification spelling may change; `state.get("activeTool")` is the runtime acceptance gate and is what `apply.js` reads. And the notification must **not** become `analysis_tool`: that name is already a config key in every host's `WORKSPACE_CONFIG_KEYS`, so it would start being merged into the next show's config by `combined_config` — which is not what an event key is for.
 - **The names are `cad_viewer_widget` traitlets**, so a rename is an API change there: `lastPick`, `activeTool` and `selectedShapeIDs` are declared traits, two of them with `@observe` handlers that post the same camelCase spelling in the body of the HTTP request to the measurement backend. `lastPick` is the mildest — `CadViewer.last_pick` is already the public property in front of it.
 
 The choke point is `ocp_viewer_core/backend.py`, which reads `changes["activeTool"]` and `changes["selectedShapeIDs"]` for **both** transports — the websocket hosts and Jupyter CadQuery's HTTP one — so it changes once and serves all three.

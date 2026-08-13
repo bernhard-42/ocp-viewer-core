@@ -1,9 +1,14 @@
 """The transport a host implements, and the session over it.
 
-`Comms` is the whole of what a host must provide: five ways to send, one to
-listen, and a test for its own viewer handle. `Session` is the shared half -
-it caches the two reads a show makes and scopes both those answers and the
-call's keywords to one call.
+`Comms` is what the shared show pipeline needs from a host: four ways to send,
+a name translation, a test for its own viewer handle, and the scope that
+carries a call's keywords. `Session` is the shared half - it caches the two
+reads a show makes and scopes both those answers and the call's keywords to one
+call.
+
+It is a *client* transport, and only that. The measurement backend has none:
+it is always called by something that already holds a channel, so it answers by
+returning and its caller does the sending. See `ViewerBackend`.
 """
 
 #
@@ -59,6 +64,12 @@ class Comms(Generic[H]):
     Everything above this line is host-neutral; everything below it is the
     host's business - a websocket, a comm channel, a socket of our own. The
     vocabulary is fixed, which is what makes the layer above swappable.
+
+    Every method here exists because the *core* has to initiate something: a
+    show sends a model, a config or a command; a session asks the viewer two
+    questions. Where the core is instead answering someone who reached in -
+    which is the whole of the measurement backend - no method is needed, and
+    there is none.
     """
 
     def __init__(self):
@@ -90,10 +101,6 @@ class Comms(Generic[H]):
         """Send data to the measurement backend"""
         raise NotImplementedError
 
-    def send_response(self, data: Any, timeit: bool = False) -> None:
-        """Answer a request from the viewer"""
-        raise NotImplementedError
-
     def encode_config(self, config: Any) -> Any:
         """Put a config block into the names this host's viewer reads.
 
@@ -107,19 +114,6 @@ class Comms(Generic[H]):
         knows what is at the other end.
         """
         return to_javascript(config)
-
-    def listen(self, callback) -> None:
-        """Take messages from the viewer until it stops, calling back for each.
-
-        The other direction, and the one only the measurement backend needs: it
-        is a process of its own that waits to be asked. `callback(payload,
-        message_type)` per message, and the call does not return until the
-        viewer says stop.
-
-        A host with no such channel need not override this - Jupyter CadQuery
-        answers in-process and never listens.
-        """
-        raise NotImplementedError
 
     def is_handle(self, obj: Any) -> bool:
         """Whether `obj` is this host's viewer handle.

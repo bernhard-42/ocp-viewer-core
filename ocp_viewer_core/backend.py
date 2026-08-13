@@ -34,7 +34,7 @@ from ocp_tessellate.tessellator import (
 )
 from ocp_tessellate.trace import Trace
 
-from .comms import Comms, MessageType
+from .comms import MessageType
 from .logo import logo
 from .measure import get_distance, get_properties
 
@@ -70,20 +70,27 @@ def error_handler(func):
 
 
 class ViewerBackend:
-    """
-    Represents the backend of the viewer, it listens to the websocket and handles the events
-    It's job is to send responses to the vscode extension that goes through the three cad
-    viewer view.
-    The responses holds all the data needed to display the measurements.
+    """Exact geometry for a viewer's measurement tools.
+
+    Given a model and a change set, it answers with the measurement the viewer
+    asked for - and it answers by **returning**, never by sending. It holds no
+    transport at all.
+
+    That is not an omission. A change set only ever arrives because something
+    already reached in: a socket message, an HTTP request, a line on a pipe. So
+    whoever drove this already holds the channel the answer goes back on, and
+    giving the backend its own would be a second route to a destination the
+    caller can already reach. Every host proved it: two ended up with a no-op
+    `send_response`, one with a class of four dead methods, and build123d
+    Studio - which built the same thing independently - never gave its
+    `Measurements` a transport in the first place.
+
+    `handle_event` returns the response, or None when there is nothing to say -
+    every DATA message, and any UPDATES with no active tool, no selection, or a
+    selection the active tool cannot use. **Callers must check.**
     """
 
-    def __init__(self, comms: Comms) -> None:
-        # The transport, not a port. Which viewer this backend answers, and how
-        # it answers, is the host's business - the same injection the show
-        # pipeline takes, one layer down. `jcv_id` went with it: it named the
-        # widget a response belonged to, which is something an injected Comms
-        # holds without anybody being told about widgets.
-        self.comms = comms
+    def __init__(self) -> None:
         # An empty model rather than None. It is only ever assigned a dict and
         # never compared against None, and typed as None every subscript into it
         # reads as an error - twelve of them, all describing the annotation
@@ -93,13 +100,15 @@ class ViewerBackend:
         self.filter_type = "none"  # The current active selection filter
 
     def start(self):
-        """
-        Start the backend
+        """Load the splash, so it is measurable before any model is shown.
+
+        What used to follow this - handing `handle_event` to a listener - is the
+        host's, because only the host knows whether its backend is driven by a
+        loop it owns or called by a server that already has the request.
         """
         print("Viewer backend started", flush=True)
         self.load_model(logo)
         print("Logo model loaded", flush=True)
-        self.comms.listen(self.handle_event)
 
     @error_handler
     def handle_event(self, message, event_type: MessageType):
@@ -214,8 +223,6 @@ class ViewerBackend:
         response["subtype"] = "tool_response"
         response["tool_type"] = Tool.Properties
 
-        self.comms.send_response(response)
-        print_to_stdout(f"Data sent {response}")
         return response
 
     def handle_distance(self, id1, id2, center):
@@ -232,6 +239,4 @@ class ViewerBackend:
         response["subtype"] = "tool_response"
         response["tool_type"] = Tool.Distance
 
-        self.comms.send_response(response)
-        print_to_stdout(f"Data sent {response}")
         return response
