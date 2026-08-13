@@ -515,6 +515,7 @@ class Config:
         tools=None,
         tree_width=None,
         theme=None,
+        modifier_keys=None,
         # Every key in `keys.SETTABLE` needs a parameter here: `reset_defaults`
         # builds its call from that list, and one without a parameter raises
         # TypeError as soon as a viewer reports it.

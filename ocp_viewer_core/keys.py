@@ -247,6 +247,10 @@ SETTABLE = merge(
             # renderer has setTheme, and a host whose surface changes theme
             # under it - a VS Code colour theme - needs to say so.
             "theme",
+            # Likewise, and for the same reason it was missed: the renderer has
+            # had `setKeyMap` all along and nothing called it, so the keymap
+            # looked like a construction-time option and was not one.
+            "modifier_keys",
         )
     },
 )
