@@ -212,7 +212,18 @@ class Session(Generic[H]):
         call. Routed through the Session rather than reaching into `comms`
         from `show`, so that a host overriding `Comms.begin` sees every call
         the core makes and not only the ones show happens to know about.
+
+        The scope opens *empty*, which `clear` alone did not guarantee. A read
+        made outside a show - `status()` and `workspace_config()` are exported
+        by every host - filled the cache, and nothing emptied it until the end
+        of the next show, so that show answered out of an older reading instead
+        of asking. Measured: a show sent two commands from a fresh process and
+        one after a direct `status()` call. `_splash` is the sharp end, since a
+        cached `True` from while the logo was up forces a camera reset and
+        discards an explicit `reset_camera=`.
         """
+        self._status = None
+        self._workspace_config = None
         self.comms.begin(keywords)
 
     def status(self) -> Any:

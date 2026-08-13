@@ -401,7 +401,13 @@ class Config:
         if is_pytest():
             return {}
 
-        response = self.session.status()
+        # A copy, because what the session hands back is the *cached* answer and
+        # this converts a value in it. Mutating it in place made the second read
+        # of one show see its own conversion and report the enum it had just
+        # written as an unknown value from the viewer - the warning
+        # "Unknown collapse value from viewer: Collapse.ROOT", which hosts had
+        # taken to filtering rather than tracing.
+        response = dict(self.session.status())
         if debug:
             return response.get("_debugStarted", False)
 
