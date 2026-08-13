@@ -240,7 +240,28 @@ class Config:
         self.all = keys.ALL
         self.settable = keys.SETTABLE
 
-        self.defaults = dict(DEFAULT_DEFAULTS)
+        self.defaults = self._initial_defaults()
+
+    @staticmethod
+    def _initial_defaults():
+        """The defaults a Config starts with, and the ones a reset returns to.
+
+        `NOT_RESTORED_ON_RESET` is honoured here as well as in
+        `reset_defaults`, and the two agreeing is the point. They did not:
+        construction took `DEFAULT_DEFAULTS` whole, so `collapse` sat in the
+        defaults - which `combined_config` applies *last* - and masked both the
+        host's stored setting and the tree the user had just opened, on every
+        show until something called `reset_defaults()`. All three hosts ship a
+        collapse setting and none of them could take effect.
+
+        The comment on `NOT_RESTORED_ON_RESET` always described this exactly;
+        only the reset path acted on it.
+        """
+        return {
+            key: value
+            for key, value in DEFAULT_DEFAULTS.items()
+            if key not in NOT_RESTORED_ON_RESET
+        }
 
     def validate_keyword(self, key):
         """Why this host cannot act on `key`, or None if it can.
@@ -286,6 +307,25 @@ class Config:
                     f"{key}={value!r} is not valid. "
                     f"Use one of {', '.join(repr(a) for a in allowed)}"
                 )
+
+    def normalize_values(self, kwargs):
+        """Put a documented shorthand into the shape the renderer takes.
+
+        `grid` is documented as a boolean and three-cad-viewer's `setGrids`
+        spreads its argument over the three planes, so a bare `True` is a
+        `TypeError` in the page - and because the throw escapes `applyConfig`'s
+        loop, every key after `grid` in the same block is lost with it.
+
+        Here rather than in each entry point: the expansion used to live in
+        `_show_impl` alone, so `show(grid=True)` worked while
+        `set_defaults(grid=True)` and `set_viewer_config(grid=True)` did not -
+        and the stored default then rode a boolean into every later show.
+        Idempotent, so an entry point that normalizes before delegating to
+        another costs nothing.
+        """
+        if isinstance(kwargs.get("grid"), bool):
+            kwargs = {**kwargs, "grid": [kwargs["grid"]] * 3}
+        return kwargs
 
     def validate_tool_args(
         self, explode: bool | None, analysis_tool: AnalysisTool | str | None
@@ -512,6 +552,7 @@ class Config:
         }
 
         self.validate_values(config)
+        config = self.normalize_values(config)
 
         if config.get("default_edgecolor") is not None:
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
@@ -725,6 +766,7 @@ class Config:
 
         kwargs = self.check_deprecated(kwargs)
         self.validate_values(kwargs)
+        kwargs = self.normalize_values(kwargs)
 
         for key, value in kwargs.items():
             if key in self.all and not key in self.exclude_keys:
@@ -752,11 +794,7 @@ class Config:
             if config.get("transparent") is not None:
                 self.set_viewer_config(transparent=config["transparent"])
 
-        self.defaults = {
-            key: value
-            for key, value in DEFAULT_DEFAULTS.items()
-            if key not in NOT_RESTORED_ON_RESET
-        }
+        self.defaults = self._initial_defaults()
 
     def check_deprecated(self, kwargs, _length=1):
         """Check for deprecated arguments"""

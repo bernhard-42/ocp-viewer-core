@@ -627,6 +627,14 @@ class Viewer(Generic[H]):
         params["_splash"] = False  # after the first show, _splash is False
 
         # replace enums with their values
+        #
+        # Every enum-valued key belongs here, including `collapse` - which is
+        # unwrapped earlier on the *config* path and was missing here, so a
+        # `collapse=` keyword rode out as a Collapse. Nothing broke, because
+        # both transports happen to rescue it: orjson's `default` unwraps any
+        # Enum and Jupyter CadQuery's `_collapse_to_letter` handles one on
+        # purpose. A host serialising with plain json.dumps - the next one to
+        # adopt - would have got a TypeError instead.
         for key in (
             "studio_environment",
             "studio_background",
@@ -635,6 +643,7 @@ class Viewer(Generic[H]):
             "analysis_tool",
             "tab",
             "reset_camera",
+            "collapse",
         ):
             if isinstance(params.get(key), Enum):
                 params[key] = params[key].value
@@ -1134,8 +1143,7 @@ class Viewer(Generic[H]):
         if modes is None:
             modes = kwargs.pop("modes", None)
 
-        if kwargs.get("grid") is not None and isinstance(kwargs["grid"], bool):
-            kwargs["grid"] = [kwargs["grid"]] * 3
+        kwargs = self.config.normalize_values(kwargs)
 
         timeit = self.config.preset("timeit", timeit)
 
