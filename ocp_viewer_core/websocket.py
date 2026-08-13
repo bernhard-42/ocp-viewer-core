@@ -112,6 +112,19 @@ def _ipython():
     return module.get_ipython() if module is not None else None
 
 
+# What a read answers with when no viewer could be reached. Enough for the
+# config paths to carry on rather than fail: the two calls that matter here are
+# `workspace_config` and `status`, and a show that cannot ask still draws.
+# Spelled once - it was written out twice, in two handlers that return it.
+NO_VIEWER_CONFIG = {
+    "collapse": Collapse.ROOT,
+    "_splash": False,
+    "default_facecolor": (238, 130, 238),
+    "default_thickedgecolor": (186, 85, 211),
+    "default_vertexcolor": (186, 85, 211),
+}
+
+
 def port_check(port, host=DEFAULT_HOST):
     """Check whether the port is listening.
 
@@ -234,86 +247,93 @@ class WebSocketComms(Comms[None]):
         master's choice and worth keeping: the viewer may be restarted between two
         shows, and a socket held across that is a socket that has to be noticed as
         dead and rebuilt.
+
+        Encoding and connecting are two steps and fail for unrelated reasons, so
+        each catches its own. They used to share one `except Exception` around
+        the whole method which printed "Cannot connect to viewer on port N, is
+        it running and the right port provided?" - measured: a value orjson
+        could not encode printed exactly that and returned None. That is the
+        message a leaked Enum on the wire would have produced on any host
+        without orjson's `default` to rescue it, and it sends the reader to look
+        at the network for a bug in the payload.
         """
         if port is None:
             port = self.port
-        try:
-            with Timer(timeit, "", "json dumps", 1):
+
+        with Timer(timeit, "", "json dumps", 1):
+            try:
                 j = orjson.dumps(data, default=default)  # pylint: disable=no-member
-                if message_type == MessageType.COMMAND:
-                    j = b"C:" + j
-                elif message_type == MessageType.DATA:
-                    j = b"D:" + j
-                elif message_type == MessageType.LISTEN:
-                    j = b"L:" + j
-                elif message_type == MessageType.BACKEND:
-                    j = b"B:" + j
-                elif message_type == MessageType.BACKEND_RESPONSE:
-                    j = b"R:" + j
-                elif message_type == MessageType.CONFIG:
-                    j = b"S:" + j
+            except orjson.JSONEncodeError as ex:  # pylint: disable=no-member
+                # `print`, not `comms_warning`: that one fires at most once per
+                # session, on the argument that a viewer which is not running
+                # would otherwise paper the console with the same line. An
+                # encoding failure is a different fault with a different remedy,
+                # and sharing the once-only flag would mean whichever happened
+                # first silenced the other for the rest of the session.
+                #
+                # None, which is what the old outer handler returned here: the
+                # diagnosis changes, not what the caller gets back.
+                print(f"Cannot encode this message for the viewer: {ex}")
+                return None
 
-            with Timer(timeit, "", f"websocket connect ({message_type.name})", 1):
-                try:
-                    with connect(f"{self.url}:{port}", close_timeout=0.05) as ws:
-                        ws.send(j)
+            if message_type == MessageType.COMMAND:
+                j = b"C:" + j
+            elif message_type == MessageType.DATA:
+                j = b"D:" + j
+            elif message_type == MessageType.LISTEN:
+                j = b"L:" + j
+            elif message_type == MessageType.BACKEND:
+                j = b"B:" + j
+            elif message_type == MessageType.BACKEND_RESPONSE:
+                j = b"R:" + j
+            elif message_type == MessageType.CONFIG:
+                j = b"S:" + j
 
-                        with Timer(
-                            timeit, "", f"websocket send {len(j) / 1024 / 1024:.3f} MB", 1
+        with Timer(timeit, "", f"websocket connect ({message_type.name})", 1):
+            try:
+                with connect(f"{self.url}:{port}", close_timeout=0.05) as ws:
+                    ws.send(j)
+
+                    with Timer(
+                        timeit, "", f"websocket send {len(j) / 1024 / 1024:.3f} MB", 1
+                    ):
+                        result = None
+                        no_response_commands = ("screenshot", "set_relative_time")
+                        if message_type == MessageType.COMMAND and not (
+                            isinstance(data, dict)
+                            and data.get("type") in no_response_commands
                         ):
-                            result = None
-                            no_response_commands = ("screenshot", "set_relative_time")
-                            if message_type == MessageType.COMMAND and not (
-                                isinstance(data, dict)
-                                and data.get("type") in no_response_commands
-                            ):
-                                try:
-                                    result = json.loads(ws.recv())
-                                except Exception as ex:  # pylint: disable=broad-except  # noqa: BLE001
-                                    print(ex)
-                            elif message_type == MessageType.COMMAND and (
-                                isinstance(data, dict)
-                                and data.get("type") in no_response_commands
-                            ):
-                                result = {}
-                            elif message_type == MessageType.BACKEND:
-                                ack = json.loads(ws.recv())
-                                if not ack.get("ok"):
-                                    print(
-                                        "Warning: OCP CAD Viewer backend is not connected "
-                                        "— measurements/properties unavailable",
-                                        flush=True,
-                                    )
+                            try:
+                                result = json.loads(ws.recv())
+                            except Exception as ex:  # pylint: disable=broad-except  # noqa: BLE001
+                                print(ex)
+                        elif message_type == MessageType.COMMAND and (
+                            isinstance(data, dict)
+                            and data.get("type") in no_response_commands
+                        ):
+                            result = {}
+                        elif message_type == MessageType.BACKEND:
+                            ack = json.loads(ws.recv())
+                            if not ack.get("ok"):
+                                print(
+                                    "Warning: OCP CAD Viewer backend is not connected "
+                                    "— measurements/properties unavailable",
+                                    flush=True,
+                                )
 
-                except (ConnectionRefusedError, OSError, WebSocketException) as ex:
-                    comms_warning(f"Connection error: {ex}\nMessage: {data}")
-                    # set some dummy values to avoid errors
-                    return {
-                        "collapse": Collapse.ROOT,
-                        "_splash": False,
-                        "default_facecolor": (238, 130, 238),
-                        "default_thickedgecolor": (186, 85, 211),
-                        "default_vertexcolor": (186, 85, 211),
-                    }
-                except Exception as ex:  # noqa: BLE001
-                    comms_warning(f"Unexpected error: {ex}\n{traceback.format_exc()}")
-                    # set some dummy values to avoid errors
-                    return {
-                        "collapse": Collapse.ROOT,
-                        "_splash": False,
-                        "default_facecolor": (238, 130, 238),
-                        "default_thickedgecolor": (186, 85, 211),
-                        "default_vertexcolor": (186, 85, 211),
-                    }
+            except (ConnectionRefusedError, OSError, WebSocketException) as ex:
+                comms_warning(
+                    f"Cannot reach a viewer on port {port}: {ex}\n"
+                    f"Is it running, and is that the right port?"
+                )
+                # set some dummy values to avoid errors
+                return dict(NO_VIEWER_CONFIG)
+            except Exception as ex:  # noqa: BLE001
+                comms_warning(f"Unexpected error: {ex}\n{traceback.format_exc()}")
+                # set some dummy values to avoid errors
+                return dict(NO_VIEWER_CONFIG)
 
-            return result
-
-        except Exception as ex:  # pylint: disable=broad-except  # noqa: BLE001
-            print(
-                f"Cannot connect to viewer on port {port}, is it running and the right port provided?"
-            )
-            print(ex)
-            return None
+        return result
 
     def listener(self, callback):
         """Drive a measurement backend from this viewer's notifications.

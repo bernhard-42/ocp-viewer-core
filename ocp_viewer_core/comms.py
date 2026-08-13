@@ -265,13 +265,13 @@ class Session(Generic[H]):
             "config": self.comms.encode_config(config),
         }
 
-        try:
-            self.comms.send_config(data)
-
-        except Exception as ex:
-            raise RuntimeError(
-                "Cannot set viewer config. Is the viewer running?\n" + str(ex.args)
-            ) from ex
+        # Sent, not guarded. The `except Exception` that was here re-raised
+        # "Cannot set viewer config. Is the viewer running?" for anything at
+        # all, and a viewer that is not running does not raise: the websocket
+        # client catches its own connection errors, warns, and returns. What
+        # this caught instead were bugs, wearing a message that sent the reader
+        # to look at the viewer.
+        self.comms.send_config(data)
 
 
 def is_pytest():

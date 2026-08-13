@@ -178,6 +178,22 @@ COLLAPSE_REVERSE_MAPPING = {
     1: Collapse.ROOT,
 }
 
+# How a host spells a stored collapse setting. Both vocabularies are live and
+# neither is ours: VS Code's setting is an enum of the four words
+# (`package.json`), while ocp_viewer and Jupyter CadQuery store the widget's own
+# letters in a hand-editable YAML file. Module level, beside the numbers above,
+# so the three collapse vocabularies are stated in one place.
+COLLAPSE_NAME_MAPPING = {
+    "none": Collapse.NONE,
+    "leaves": Collapse.LEAVES,
+    "all": Collapse.ALL,
+    "root": Collapse.ROOT,
+    "E": Collapse.NONE,
+    "1": Collapse.LEAVES,
+    "C": Collapse.ALL,
+    "R": Collapse.ROOT,
+}
+
 
 # The defaults that are ours rather than the viewer's - the ones no workspace
 # setting and no viewer state supplies. Module level and copied per instance,
@@ -409,40 +425,48 @@ class Config:
                 "default_vertexcolor": (186, 85, 211),
             }
 
-        try:
-            conf = self.session.workspace_config()
-            mapping = {
-                "none": Collapse.NONE,
-                "leaves": Collapse.LEAVES,
-                "all": Collapse.ALL,
-                "root": Collapse.ROOT,
-                "E": Collapse.NONE,
-                "1": Collapse.LEAVES,
-                "C": Collapse.ALL,
-                "R": Collapse.ROOT,
-            }
-            if isinstance(conf.get("collapse"), str):
-                conf["collapse"] = mapping[conf.get("collapse", "R")]
-            if isinstance(conf.get("reset_camera"), str):
-                conf["reset_camera"] = Camera[conf.get("reset_camera", "KEEP").upper()]
-            return dict(conf)
+        # No try/except here, deliberately. This used to be wrapped in
+        # `except Exception` re-raised as "Cannot access viewer config. Is the
+        # viewer running?" - and a viewer that is not running never reaches it:
+        # `WebSocketComms._send` catches ConnectionRefusedError/OSError/
+        # WebSocketException itself, warns, and returns a dummy config. So the
+        # one cause the message named was the one case it could not see, and
+        # everything it *did* catch - a misspelt value in a hand-edited config
+        # file, a corrupt settings file, a bug in this file - was reported as a
+        # viewer that was down. An exception arriving here is not a transport
+        # failure and must not be dressed as one.
+        conf = dict(self.session.workspace_config())
 
-        except Exception as ex:
-            raise RuntimeError(
-                "Cannot access viewer config. Is the viewer running?\n" + str(ex.args)
-            ) from ex
+        collapse = conf.get("collapse")
+        if isinstance(collapse, str):
+            if collapse not in COLLAPSE_NAME_MAPPING:
+                raise ValueError(
+                    f"collapse={collapse!r} in the stored config is not valid. "
+                    f"Use one of {', '.join(repr(k) for k in COLLAPSE_NAME_MAPPING)}"
+                )
+            conf["collapse"] = COLLAPSE_NAME_MAPPING[collapse]
+
+        reset_camera = conf.get("reset_camera")
+        if isinstance(reset_camera, str):
+            try:
+                conf["reset_camera"] = Camera[reset_camera.upper()]
+            except KeyError:
+                raise ValueError(
+                    f"reset_camera={reset_camera!r} in the stored config is not "
+                    f"valid. Use one of {', '.join(c.name for c in Camera)}"
+                ) from None
+
+        return conf
 
     def combined_config(self):
         """Get combined config from workspace and status"""
 
-        try:
-            wspace_config = self.workspace_config()
-            wspace_status = self.status()
-
-        except Exception as ex:
-            raise RuntimeError(
-                "Cannot access viewer config. Is the viewer running?\n" + str(ex.args)
-            ) from ex
+        # Both calls raise for themselves. Wrapping them in `except Exception`
+        # re-raised the same sentence a second time - so a failure inside
+        # `workspace_config` printed that message twice, the inner copy quoted
+        # inside a stringified tuple.
+        wspace_config = self.workspace_config()
+        wspace_status = self.status()
 
         use_status = not wspace_config.get("_splash", False)
 
