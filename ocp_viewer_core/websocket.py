@@ -30,8 +30,6 @@ wrappers over their own instance.
 # limitations under the License.
 #
 
-import base64
-import enum
 import json
 import os
 import socket
@@ -40,16 +38,11 @@ import traceback
 import warnings
 
 import orjson
-from ocp_tessellate.ocp_utils import (
-    is_toploc_location,
-    is_topods_shape,
-    loc_to_tq,
-    serialize,
-)
 from ocp_tessellate.utils import Timer
 from websockets.exceptions import WebSocketException
 from websockets.sync.client import connect
 
+from .codec import default
 from .comms import Comms, MessageType
 from .config import Collapse
 from .state import get_config_file, get_ports, update_state
@@ -137,20 +130,6 @@ def port_check(port, host=DEFAULT_HOST):
     if result:
         s.close()
     return result
-
-
-def default(obj):
-    """Default JSON serializer."""
-    if is_topods_shape(obj):
-        # `serialize` is annotated as optionally returning None and does not
-        # for a shape that exists; the annotation is ocp_tessellate's to fix.
-        return base64.b64encode(serialize(obj)).decode("utf-8")  # ty: ignore[invalid-argument-type]
-    elif is_toploc_location(obj):
-        return loc_to_tq(obj)
-    elif isinstance(obj, enum.Enum):
-        return obj.value
-    else:
-        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
 class WebSocketComms(Comms[None]):
