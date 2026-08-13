@@ -149,6 +149,55 @@ def ignore_camera_warnings():
     warnings.filterwarnings("ignore", category=CameraKeepWarning)
 
 
+def is_drawable(obj):
+    """Whether the tessellator could make anything of this value.
+
+    A whitelist of what is known to tessellate rather than a blacklist of what
+    obviously does not - the tessellator's own predicates, asked of the package
+    that owns them.
+
+    It exists for containers. `show_all` walks a scope and used to accept any
+    `list`, `tuple` or `dict` on sight, and a scope is full of lists of numbers:
+    one of those reaches `_convert`, which produces a model with a header and no
+    geometry, and three-cad-viewer does not come back from one - the application
+    it was found in had to be force-quit. A container is drawable when its
+    contents are, and an empty one is not.
+
+    It came from build123d Studio, which had written the recursive version for
+    itself; this is the one place the golden master is deliberately not
+    preserved.
+    """
+    if isinstance(obj, (list, tuple)):
+        return len(obj) > 0 and all(is_drawable(item) for item in obj)
+    if isinstance(obj, dict):
+        # By value: the keys become names in the viewer's tree, and a mapping of
+        # shapes is an ordinary way to hold an assembly.
+        return len(obj) > 0 and all(is_drawable(item) for item in obj.values())
+    if hasattr(obj, "wrapped") and (
+        is_topods_shape(obj.wrapped)
+        or is_topods_compound(obj.wrapped)
+        or is_toploc_location(obj.wrapped)
+    ):
+        return True
+    for test in (
+        is_build123d,
+        is_build123d_axis,
+        is_build123d_location,
+        is_build123d_locationlist,
+        is_build123d_plane,
+        is_cadquery,
+        is_cadquery_assembly,
+        is_cadquery_sketch,
+        is_vector,
+    ):
+        try:
+            if test(obj):
+                return True
+        except Exception:  # noqa: BLE001,S112 - a test that dislikes a value is a no
+            continue
+    return False
+
+
 def same_bounding_box(bb1, bb2, tol=1e-6):
     """Whether two bounding boxes (dicts with xmin/ymin/zmin/xmax/ymax/zmax) match
     within a diagonal-relative tolerance. Either being None → False.
@@ -1988,7 +2037,9 @@ class Viewer(Generic[H]):
                         and hasattr(obj, "position")
                         and hasattr(obj, "direction")
                     )
-                    or isinstance(obj, (list, tuple, dict))
+                    # A container is drawable when its contents are. Accepting
+                    # any list on sight is what let a list of floats through.
+                    or (isinstance(obj, (list, tuple, dict)) and is_drawable(obj))
                 ):
                     objects.append(obj)
                     names.append(name)
