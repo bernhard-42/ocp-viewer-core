@@ -98,6 +98,11 @@ export const DISPLAY_DEFAULTS = {
   measureTools: true,
   selectTool: true,
   explodeTool: true,
+  // Stated here rather than left to the renderer's own default, which is
+  // `true`: a host passing `studioTool: false` to hide the Studio tab was
+  // silently keeping it, because `display.ts` tests `=== false` and the key
+  // never arrived to be tested.
+  studioTool: true,
   zebraTool: true,
   zscaleTool: false,
   externalMeasurementBackend: true,
@@ -118,6 +123,15 @@ export const RENDER_OPTION_KEYS = [
 export const VIEWER_OPTION_KEYS = [
   "axes",
   "axes0",
+  // A state key `ViewerState._update` accepts and the tree builder reads on
+  // every render (`viewer.ts:1343`, `:3446`). Without it here the setting had
+  // no route at all in the two page hosts: it is not in either one's splash
+  // config, so the Display and Viewer were built with the logo config's
+  // `true`, later shows computed it and `page.js` dropped it because the
+  // Display already existed, and `apply.js` has no setter for it. Jupyter
+  // CadQuery is the contrast that proves it - there `viewer_args` carries it
+  // and it works.
+  "newTreeBehavior",
   "blackEdges",
   "grid",
   "collapse",
@@ -238,6 +252,16 @@ export function buildDisplayOptions(config, overrides, geometry) {
 
     // Capability flags the host owns: whether a tool exists in this surface at
     // all is not something a document can ask for.
+    //
+    // `pinning` and `studioTool` were merged into `defaults` above and then
+    // left out of this hand-written list, so they never reached the renderer.
+    // `display.ts` reads `options.pinning` in its constructor, which is why
+    // cad-viewer-widget's pin-as-PNG button could not appear in any cell
+    // viewer, `pinning=True` asked for or defaulted. Nothing was said: an
+    // option the renderer does not receive is indistinguishable from one it
+    // was never given.
+    pinning: defaults.pinning,
+    studioTool: defaults.studioTool,
     measureTools: defaults.measureTools,
     selectTool: defaults.selectTool,
     explodeTool: defaults.explodeTool,

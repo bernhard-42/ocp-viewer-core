@@ -106,6 +106,13 @@ const SETTERS = {
   metalness: (v, value, ctx) => call(v, "setMetalness", [value], ctx.notify),
   roughness: (v, value, ctx) => call(v, "setRoughness", [value], ctx.notify),
 
+  // three-cad-viewer has had `setKeyMap(config)` all along (`viewer.ts:4538`)
+  // and nothing called it: the keymap reached only `new Display(...)`, which
+  // runs once per page, so the modifier keys a user configured applied in
+  // whichever host happened to pass them at splash and nowhere else, and could
+  // never be changed on a live viewer.
+  keymap: (v, value) => v.setKeyMap(value),
+
   zoomSpeed: (v, value, ctx) => call(v, "setZoomSpeed", [value], ctx.notify),
   panSpeed: (v, value, ctx) => call(v, "setPanSpeed", [value], ctx.notify),
   rotateSpeed: (v, value, ctx) => call(v, "setRotateSpeed", [value], ctx.notify),
