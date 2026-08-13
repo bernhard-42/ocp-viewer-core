@@ -306,10 +306,14 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
             }
         } else if (data.type === "backend_response") {
             viewer.handleBackendResponse(data);
-        } else if (data.type === "clear") {
-            viewer.clear();
-        } else if (data.type === "show") {
-            showViewer();
+        // No `clear` or `show` branch: nothing in any host sends either, and
+        // `show` was a landmine rather than merely dead - `showViewer()` with
+        // no arguments evaluates `getDisplayOptions(config.theme)` against an
+        // undefined config and throws before reaching its own null guard, and
+        // it assigns `_meshData = undefined` on the way, destroying the stored
+        // model so that even a corrected call could not re-show. If a host
+        // ever needs to re-render what it already has, that is `showViewer(
+        // _meshData, _config)` guarded on `_meshData` being present.
         } else if (data.type === "ui") {
             if (_config["_splash"]) {
                 return;
