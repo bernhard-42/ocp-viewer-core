@@ -3,8 +3,9 @@
  *
  * A host's HTML supplies only what is genuinely its own: where it loaded these
  * modules from, where its settings come from, and how to send a message. Even
- * measuring the surface is here - every host so far measures the window and
- * subtracts the same chrome, and one that does not can pass its own geometry.
+ * measuring the surface is here - a host that owns a whole browsing context
+ * gets the window measured for it, and one that shows the viewer in a pane
+ * passes its own container and its own size.
  *
  * This is the one module in the package that touches the DOM, and it does so
  * because it *is* the page. Everything else here takes a viewer and plain data
@@ -46,12 +47,30 @@ const MIN_WIDTH = 450;
  * @param send        (command, message) => void - the host's channel to Python
  * @param overrides   {display, viewer} - the settings this host differs on
  * @param theme       the host's resolved theme, for the observer below
- * @returns `{ showSplash, setTheme }` - the page listens for its own messages,
- *          which both hosts deliver as a `message` event: the extension posts
- *          into the webview, and the standalone's socket shim posts what came
- *          off the wire.
+ * @param container   the element to draw into, or its id. Default "cad_viewer"
+ * @param getSize     () => {width, height} of the surface. Default the window
+ * @param listen      attach the window's `message` and `resize` listeners.
+ *                    Default true; a host that has neither passes false and
+ *                    drives `handleMessage` and `resize` itself
+ * @returns `{ showSplash, setTheme, handleMessage, resize }` - the two page
+ *          hosts deliver messages as a `message` event, the extension posting
+ *          into the webview and the standalone's socket shim posting what came
+ *          off the wire, and both let this file listen for them. A host whose
+ *          models arrive some other way calls `handleMessage` with the same
+ *          objects, so every host runs the one dispatch and no host can end up
+ *          with a message branch, and so a feature, that another lacks.
  */
-export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
+export function createPage({
+    Viewer,
+    Display,
+    Timer,
+    send,
+    overrides,
+    theme,
+    container,
+    getSize,
+    listen
+}) {
     var viewer = null;
     var display = null;
     var _shapes = null;
@@ -130,11 +149,63 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
         return Math.max(MIN_WIDTH - treeWidth, width - treeWidth - 20);
     }
 
-    function normalizeHeight(height) {
-        return height - 65;
+    /**
+     * The chrome above the canvas, measured rather than assumed.
+     *
+     * This was the constant 65, which is an approximation of the canvas's own
+     * top offset and wrong in both directions: it over-reserves in a pane,
+     * showing as a bottom margin visibly larger than the left and top ones,
+     * and measuring the toolbar alone instead under-reserves - the toolbar's
+     * offset and the gap below it are part of the same distance, and without
+     * them the canvas overflows and clips the status line, which is pinned to
+     * `bottom: 4px` inside it.
+     *
+     * Taken from the container so that it means the same thing to a host that
+     * owns the window and to one that draws into a pane.
+     */
+    const ASSUMED_CHROME = 65;
+
+    function getContainer() {
+        if (container == null) {
+            return document.getElementById("cad_viewer");
+        }
+        return typeof container === "string"
+            ? document.getElementById(container)
+            : container;
     }
 
-    function getSize() {
+    function reservedHeight() {
+        const element = getContainer();
+        if (element == null) {
+            return ASSUMED_CHROME;
+        }
+        const canvas = element.querySelector(
+            ".tcv_cad_view_glass, .tcv_cad_view"
+        );
+        if (canvas != null) {
+            const offset =
+                canvas.getBoundingClientRect().top -
+                element.getBoundingClientRect().top;
+            if (offset > 0) {
+                return Math.round(offset);
+            }
+        }
+        // Before the canvas exists, approximate from the toolbar if it is there.
+        const toolbar = element.querySelector(".tcv_cad_toolbar");
+        if (toolbar != null && toolbar.offsetHeight > 0) {
+            return toolbar.offsetHeight + 10;
+        }
+        return ASSUMED_CHROME;
+    }
+
+    function normalizeHeight(height) {
+        return height - reservedHeight();
+    }
+
+    function measureSize() {
+        if (getSize != null) {
+            return getSize();
+        }
         return {
             width: window.innerWidth,
             height: window.innerHeight
@@ -142,7 +213,7 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
     }
 
     function getGeometry() {
-        const size = getSize();
+        const size = measureSize();
         const glass = preset(_config, "glass", overrides.display.glass);
         const tools = preset(_config, "tools", overrides.display.tools);
         return {
@@ -177,9 +248,9 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
         _config = config;
         const displayOptions = getDisplayOptions(config.theme);
         if (display == null) {
-            const container = document.getElementById("cad_viewer");
-            container.innerHTML = "";
-            display = new Display(container, displayOptions);
+            const element = getContainer();
+            element.innerHTML = "";
+            display = new Display(element, displayOptions);
         }
         if (_config == null) {
             debugLog("OCP CAD Viewer: config is null");
@@ -223,36 +294,30 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
         // viewer.trimUI(["axes", "axes0", "grid", "ortho", "more", "help"])
     }
 
-    window.addEventListener(
-        "resize",
-        function (event) {
-            if (viewer != null) {
-                const displayOptions = getDisplayOptions(_config.theme);
-                viewer.resizeCadView(
-                    displayOptions.cadWidth,
-                    displayOptions.treeWidth,
-                    displayOptions.height,
-                    displayOptions.glass
-                );
-                viewer.gridHelper.clearCache();
-                viewer.gridHelper.update(viewer.getCameraZoom(), true);
-                viewer.update(true, true);
-            }
-        },
-        true
-    );
-
-
-    window.addEventListener("message", (event) => {
-        var data =
-            typeof event.data === "string" || event.data instanceof String
-                ? JSON.parse(event.data)
-                : event.data;
-
-        if (data.type === "init") {
-            init(data.paths, data.settings);
-            return;
+    /**
+     * The surface changed size.
+     *
+     * A window resize for the two page hosts, and a splitter drag for a host
+     * that draws into a pane - the same work either way, which is why it is a
+     * function rather than a listener body.
+     */
+    function resize() {
+        if (viewer != null) {
+            const displayOptions = getDisplayOptions(_config.theme);
+            viewer.resizeCadView(
+                displayOptions.cadWidth,
+                displayOptions.treeWidth,
+                displayOptions.height,
+                displayOptions.glass
+            );
+            viewer.gridHelper.clearCache();
+            viewer.gridHelper.update(viewer.getCameraZoom(), true);
+            viewer.update(true, true);
         }
+    }
+
+    function handleMessage(message) {
+        var data = message;
 
         if (data.type === "logo") {
             // The splash lives in the core, so a host asks for it by name and
@@ -306,6 +371,15 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
             }
         } else if (data.type === "backend_response") {
             viewer.handleBackendResponse(data);
+        // And no `init` branch, which was the third of the same kind and the
+        // worst: it called `init(data.paths, data.settings)`, a name this
+        // module never defines. Only the extension sends an `init` message,
+        // and `viewer.html`'s own listener answers it - by *calling*
+        // `createPage`, so this listener does not exist yet when the first one
+        // arrives. A second one would have reached here and thrown a
+        // ReferenceError. Deleting it also removes the one branch that could
+        // not work from a host driving `handleMessage` directly.
+        //
         // No `clear` or `show` branch: nothing in any host sends either, and
         // `show` was a landmine rather than merely dead - `showViewer()` with
         // no arguments evaluates `getDisplayOptions(config.theme)` against an
@@ -350,7 +424,24 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
                 console.error(`Unknown animation action: ${action}`);
             });
         }
-    });
+    }
+
+    // The window is where two of the three hosts' messages and resizes arrive,
+    // and it is not where the third's do: a pane host has no window message of
+    // its own and resizes when a splitter moves, so it passes `listen: false`
+    // and calls `handleMessage` and `resize` itself. The dispatch above is the
+    // same one either way, which is the point - a message branch is a feature,
+    // and a host that wrote its own dispatch would have its own feature set.
+    if (listen !== false) {
+        window.addEventListener("resize", () => resize(), true);
+        window.addEventListener("message", (event) => {
+            handleMessage(
+                typeof event.data === "string" || event.data instanceof String
+                    ? JSON.parse(event.data)
+                    : event.data
+            );
+        });
+    }
 
     return {
         /** Draw the splash, with whatever the host knows that the core cannot. */
@@ -364,6 +455,12 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
             if (viewer != null) {
                 viewer.setTheme(next);
             }
-        }
+        },
+
+        /** One message, already parsed. What the window listener above calls. */
+        handleMessage,
+
+        /** The surface changed size. What the resize listener above calls. */
+        resize
     };
 }

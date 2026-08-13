@@ -82,6 +82,8 @@ The last four have working defaults, because not every host needs them: a host w
 
 **The cache must not outlive one show, and `_splash` is the case that proves it.** `_splash` is the handshake that stops `reset_camera=KEEP` inheriting the splash logo's camera: it is `True` while the logo is on screen and `False` from the first real model on. An answer held across shows would keep forcing a camera reset and quietly discard every explicit `reset_camera=`. So `Session.clear()` is called from `Viewer._show` in a `finally`, and `_show` is the single choke point every model send routes through — `show` calls it directly, and `_show_object` and `show_objects` reach it through `show`.
 
+**`Session.begin()` empties the cache as well, and closing it alone was not enough.** `status()` and `workspace_config()` are exported by every host, so a call outside a show filled the cache and nothing emptied it until the end of the *next* show — which therefore answered out of an older reading instead of asking. Measured: a show sends two commands from a fresh process and one after a direct `status()`. The scope now opens empty and closes empty.
+
 **`Session.send_data` is where the config block is translated**, by calling `comms.encode_config`. On `Session` rather than on `Comms` because `Comms` is what a host overrides, and a base-class conversion would be skipped by every implementation that forgot to call `super()`. Only the `config` block is renamed; the mesh beside it is geometry with its own keys, and walking it would be both wrong and expensive.
 
 ### The per-call keyword scope
@@ -170,7 +172,9 @@ Warnings are deliberately module-level rather than instance state: `warnings` is
 | module         | what it is                                       | reaches OCP |
 | -------------- | ------------------------------------------------ | ----------- |
 | `comms.py`     | the transport contract, `Session`, `MessageType` | no          |
+| `codec.py`     | what JSON cannot carry: BREP, locations, enums   | yes         |
 | `config.py`    | defaults, precedence, enums                      | no          |
+| `screenshot.py`| writing the image a viewer hands back            | no          |
 | `keys.py`      | the key vocabulary                               | no          |
 | `state.py`     | the registry of running viewers, `~/.ocpvscode`  | no          |
 | `websocket.py` | the websocket client every socket host uses      | no          |
@@ -223,9 +227,14 @@ const page = createPage({
   send, // (command, message) => void — the host's channel to Python
   overrides, // { display, viewer } — only what this host genuinely differs on
   theme, // the host's resolved theme
+  container, // the element to draw into, or its id. Default "cad_viewer"
+  getSize, // () => {width, height} of the surface. Default the window
+  listen, // attach the window's message and resize listeners. Default true
 });
-// → { showSplash(config), setTheme(next) }
+// → { showSplash(config), setTheme(next), handleMessage(data), resize() }
 ```
+
+**The last three exist for a host that owns a pane rather than a page.** build123d Studio draws the viewer into one pane of a laid-out application, measures it against a splitter rather than against the window, and receives models as binary frames on its own IPC — so it passes its container, its own `getSize`, and `listen: false`, then calls `handleMessage` and `resize` itself. Everything below stays the same, which is the point: **the message dispatch is the feature set**, so a host writing its own shell would have exactly the features it re-implemented and would drift on every one of them.
 
 The page then owns: creating the `Display` and the `Viewer`, reusing the viewer across shows (`clear()` keeps the WebGL context, the viewer state and the studio environment cache alive), measuring the window and subtracting the chrome, the resize handler, the notifier, the renderer, and a `message` listener that handles every message type a host can deliver — `data`, `logo`, `ui`, `animation`, `screenshot`, `clear`, `show`, `set_relative_time`, `backend_response`.
 
