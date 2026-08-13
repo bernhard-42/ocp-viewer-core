@@ -206,6 +206,13 @@ export function createPage({ Viewer, Display, Timer, send, overrides, theme }) {
 
         if (_shapes) renderer.render(_meshData, _config);
 
+        // Three display options are re-applied on every show, for one reason:
+        // the Display is built once, so everything it was constructed with is
+        // dropped by every show after the first. The theme is the one that was
+        // missing - `show(theme=...)` and a changed workspace setting both
+        // computed it into displayOptions and then threw it away, because by
+        // then `display` was no longer null.
+        viewer.setTheme(displayOptions.theme);
         viewer.glassMode(displayOptions.glass);
         viewer.showTools(displayOptions.tools);
 

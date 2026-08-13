@@ -213,7 +213,6 @@ SETTABLE = merge(
             "tree_width",
             "tools",
             "glass",
-            "up",
             "center_grid",
             "default_edgecolor",
             "default_opacity",
@@ -255,5 +254,15 @@ def to_javascript(config):
             renamed[key] = value
             continue
         js_name = ALL.get(key)
-        renamed[js_name if js_name is not None else _snake_to_camel(key)] = value
+        name = js_name if js_name is not None else _snake_to_camel(key)
+        if name in renamed:
+            # Two config keys landing on one renderer option is always a bug,
+            # and a silent one: the later key wins and the value it overwrites
+            # was usually the correct one. `merge` refuses this for the group
+            # tables; this is the same refusal for a payload.
+            raise ValueError(
+                f"'{key}' and another key both map to '{name}' - "
+                f"the value {renamed[name]!r} would be replaced by {value!r}"
+            )
+        renamed[name] = value
     return renamed

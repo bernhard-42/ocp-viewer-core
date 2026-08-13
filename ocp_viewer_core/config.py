@@ -129,6 +129,42 @@ class UiTab(Enum):
     STUDIO = "studio"
 
 
+# Keys whose value is one of a few named things, and what those are. A typo in
+# one of these used to travel all the way to the renderer, which drops an option
+# it does not recognise without a word - so `theme="drak"` simply did nothing,
+# in every client, with nothing said anywhere.
+#
+# Derived from the enums where there is one, so the enum stays the single place
+# a value is written down. Where there is none, the tuple is the renderer's own
+# accepted set, taken from its source rather than from a docstring.
+def _values(enum_class):
+    return tuple(member.value for member in enum_class)
+
+
+ALLOWED_VALUES = {
+    "analysis_tool": _values(AnalysisTool),
+    "collapse": _values(Collapse),
+    "reset_camera": _values(Camera),
+    "tab": _values(UiTab),
+    "studio_background": _values(StudioBackground),
+    "studio_texture_mapping": _values(StudioTextureMapping),
+    "studio_tone_mapping": _values(StudioToneMapping),
+    # No enum for these three: they are three-cad-viewer's, and this is what it
+    # accepts. `up` is the one to be careful with - its TypeScript type says
+    # "legacy", but the runtime mapping is {Y, Z, L} and anything else falls
+    # back to z_up, so "legacy" is the value it produces and not one it takes.
+    "theme": ("light", "dark", "browser"),
+    # three-cad-viewer still accepts "L", its legacy Z orientation, and may go
+    # on doing so - but the correct z_up has been there for years and no client
+    # offers the old one any more.
+    "up": ("Z", "Y"),
+    "zebra_color_scheme": ("blackwhite", "colorful", "grayscale"),
+    "zebra_mapping_mode": ("reflection", "normal"),
+}
+
+# `studio_environment` is deliberately absent: it takes a StudioEnvironment
+# member *or* a URL to a custom HDR map, so its values are not a closed set.
+
 COLLAPSE_REVERSE_MAPPING = {
     2: Collapse.NONE,
     -1: Collapse.LEAVES,
@@ -223,6 +259,28 @@ class Config:
         if key in self.exclude_keys:
             return f"'{key}' is not something this viewer can be told"
         return None
+
+    def validate_values(self, kwargs):
+        """Refuse a value that is not one of the few a key accepts.
+
+        Raised rather than warned, and raised at the entry point rather than
+        somewhere downstream: three-cad-viewer drops an option it does not
+        recognise silently, so a misspelt value has no symptom at all - it is
+        indistinguishable from not passing one.
+
+        Enum members are unwrapped first, so passing `Camera.KEEP` and passing
+        `"keep"` are the same thing here, as they are everywhere else.
+        """
+        for key, value in kwargs.items():
+            allowed = ALLOWED_VALUES.get(key)
+            if allowed is None or value is None:
+                continue
+            candidate = value.value if isinstance(value, Enum) else value
+            if candidate not in allowed:
+                raise ValueError(
+                    f"{key}={value!r} is not valid. "
+                    f"Use one of {', '.join(repr(a) for a in allowed)}"
+                )
 
     def validate_tool_args(
         self, explode: bool | None, analysis_tool: AnalysisTool | str | None
@@ -385,7 +443,10 @@ class Config:
         # Every key in `keys.SETTABLE` needs a parameter here: `reset_defaults`
         # builds its call from that list, and one without a parameter raises
         # TypeError as soon as a viewer reports it.
-        up=None,
+        #
+        # `up` is deliberately absent, and so is it from SETTABLE: the renderer
+        # reads it only when it builds a camera, which is once per render. It is
+        # set by `set_defaults` and applied by the next show.
         collapse=None,
         reset_camera=None,
         states=None,
@@ -438,6 +499,8 @@ class Config:
             for key, value in locals().items()
             if value is not None and key != "self"
         }
+
+        self.validate_values(config)
 
         if config.get("default_edgecolor") is not None:
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
@@ -650,6 +713,7 @@ class Config:
         kwargs = {k: v for k, v in locals().items() if v is not None and k != "self"}
 
         kwargs = self.check_deprecated(kwargs)
+        self.validate_values(kwargs)
 
         for key, value in kwargs.items():
             if key in self.all and not key in self.exclude_keys:

@@ -88,13 +88,16 @@ const SETTERS = {
   quaternion: (v, value, ctx) => call(v, "setCameraQuaternion", [value], ctx.notify),
   target: (v, value, ctx) => call(v, "setCameraTarget", [value], ctx.notify),
 
-  // `up` has no setter: it is written onto the camera and the projection matrix
-  // is rebuilt by hand. Kept as it is rather than tidied, because the viewer
-  // offers no other way to say it.
-  up: (v, value) => {
-    v.camera.up = value;
-    v.camera.updateProjectionMatrix();
-  },
+  // No `up` here, and it is not an omission. It cannot be applied to a live
+  // viewer: `Camera` reads `cameraUp[this.up]` once, in its constructor, so
+  // assigning `camera.up` afterwards changes nothing about the cameras - it only
+  // corrupts the lookup `presetCamera` makes, and the next click on ISO or TOP
+  // dies on `defaultDirections[undefined]`. Worse, the value written was the
+  // config's "Z", where that lookup is keyed by "z_up".
+  //
+  // `up` is a render option instead, and `Viewer.render` honours it: it builds a
+  // new `Camera` with `viewerOptions.up` every time. So `set_defaults(up=...)`
+  // takes effect on the next show, which is the only moment it can.
 
   edgeColor: (v, value, ctx) => call(v, "setEdgeColor", [value], ctx.notify),
   defaultOpacity: (v, value, ctx) => call(v, "setOpacity", [value], ctx.notify),

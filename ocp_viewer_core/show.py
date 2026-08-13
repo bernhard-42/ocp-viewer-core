@@ -783,7 +783,16 @@ class Viewer(Generic[H]):
         # meant a config carrying `dark` silently skipped it - unreachable in
         # practice only because nothing had produced `dark` since 2025.
         if config.get("orbit_control") is not None:
-            config["control"] = "orbit" if config["orbit_control"] else "trackball"
+            # Popped, not copied. Both keys map to `control` on the way out -
+            # this one by the rename in keys.ALL, the renderer's name by the
+            # mechanical fallback - so leaving both meant whichever came last in
+            # the dict won. A host that sends `control` in its workspace config,
+            # as the VS Code extension does, put the boolean there and
+            # three-cad-viewer's `switch (type)` matched neither case, leaving
+            # its controls unbuilt.
+            config["control"] = (
+                "orbit" if config.pop("orbit_control") else "trackball"
+            )
 
         if config.get("debug") is not None and config["debug"]:
             print("\nconfig:\n", config)
@@ -1121,6 +1130,7 @@ class Viewer(Generic[H]):
         }
 
         kwargs = self.config.check_deprecated(kwargs, _length=len(cad_objs))
+        self.config.validate_values(kwargs)
         if modes is None:
             modes = kwargs.pop("modes", None)
 
