@@ -94,7 +94,35 @@ class Comms(Generic[H]):
         raise NotImplementedError
 
     def send_command(self, data: Any, timeit: bool = False) -> Any:
-        """Send a command to the viewer and return its answer."""
+        """Send a command to the viewer and return its answer.
+
+        Commands are things done to a viewer - take a screenshot, set the
+        animation time. The two questions a session asks are `status` and
+        `workspace_config` below: they were once command strings, which left
+        "a host must be able to answer these two" as a convention with no
+        signature behind it, and every host dispatching on the string itself.
+        """
+        raise NotImplementedError
+
+    def status(self) -> Any:
+        """The viewer's live state - what the user has changed at the toolbar.
+
+        The half of a show's picture that only the running viewer knows. A host
+        with no viewer up answers with an empty dict rather than raising: no
+        viewer means nothing has been changed in one, which is what an empty
+        answer says.
+        """
+        raise NotImplementedError
+
+    def workspace_config(self) -> Any:
+        """The settings this host persists between sessions.
+
+        The other half, and the host's own: a settings dialog, a VS Code
+        settings section, a config file. Neither this nor `status` is knowable
+        from Python - `get_defaults` covers what `set_defaults` was told and a
+        show's keywords are in hand, but the stored settings and the toolbar are
+        outside the process - which is why the core asks rather than keeps them.
+        """
         raise NotImplementedError
 
     def send_backend(self, data: Any, timeit: bool = False) -> None:
@@ -189,12 +217,12 @@ class Session(Generic[H]):
 
     def status(self) -> Any:
         if self._status is None:
-            self._status = self.comms.send_command("status")
+            self._status = self.comms.status()
         return self._status
 
     def workspace_config(self) -> Any:
         if self._workspace_config is None:
-            self._workspace_config = self.comms.send_command("config")
+            self._workspace_config = self.comms.workspace_config()
         return self._workspace_config
 
     def clear(self) -> None:

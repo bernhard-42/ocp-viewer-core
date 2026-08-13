@@ -78,10 +78,16 @@ class RecordingComms(Comms):
     def send_command(self, data, timeit=False):
         return {}
 
+    def status(self):
+        return {}
+
+    def workspace_config(self):
+        return {}
+
 
 @pytest.fixture
 def config():
-    return Config(Session(RecordingComms()), (), ())
+    return Config(Session(RecordingComms()), ())
 
 
 # --------------------------------------------------------------------------- #

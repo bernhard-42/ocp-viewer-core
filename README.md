@@ -37,48 +37,23 @@ Early development. Nothing here is published, and the API changes without notice
 
 ### ocp vscode:
 
-Every client knows its workspace config keys:
+A host writes one class and supplies one list. `exclude_keys` names the keywords
+it may not be told, because its surface decides them - the show signature is the
+superset of every host's, so a keyword one host owns is a keyword another has to
+refuse by name rather than ignore.
 
 ```python
-workspace_config_keys = (
-    "center_grid",
-    "collapse",
-    "dark",
-    "glass",
-    "grid_font_size",
-    "orbit_control",
-    "states",
-    "ticks",
-    "tools",
-    "tree_width",
-    "up",
-    "pan_speed",
-    "rotate_speed",
-    "zoom_speed",
-    "ambient_intensity",
-    "angular_tolerance",
-    "default_color",
-    "default_edgecolor",
-    "default_facecolor",
-    "default_opacity",
-    "default_thickedgecolor",
-    "default_vertexcolor",
-    "deviation",
-    "direct_intensity",
-    "metalness",
-    "modifier_keys",
-    "roughness",
-)
-```
-
-For every `show` statement use this block:
-
-```python
-comms = Comms(...)
-session = Session(comms) # sets session cache to None
-config = Config(session, workspace_config_keys, ("cad_width", "height"))
+comms = MyComms()
+session = Session(comms)                        # sets session cache to None
+config = Config(session, ("cad_width", "height"))
 show(objects)
 ```
+
+What a host *persists* between sessions is its own business and needs no key
+list here: it answers with values, from `Comms.workspace_config()`. Which of the
+viewer's reported state counts as configuration - and so survives into the next
+show - is `keys.CONFIG`, derived from the vocabulary, because that set is a
+property of three-cad-viewer's state and not of any host's settings.
 
 ## Dependencies
 

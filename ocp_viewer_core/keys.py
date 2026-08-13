@@ -192,6 +192,32 @@ ALL = merge(
     CAMERA,
 )
 
+# The keys of a viewer's own state that are configuration, and so survive into
+# the next show. `Config.config_filter` keeps these out of the viewer's reported
+# status and drops the rest, which is what stops a second `show()` undoing what
+# the user just did at the toolbar.
+#
+# Derived rather than listed, because a hand-written copy is what this used to
+# be: an identical 61-key tuple in each of three hosts, named
+# WORKSPACE_CONFIG_KEYS as though a host chose its own. None ever did - the set
+# is a property of three-cad-viewer's state vocabulary, not of any host's
+# settings - and three copies that must stay identical is a drift waiting to
+# happen. What a host *persists* is a different question, and one only the host
+# can answer; it answers it with values, in `Comms.workspace_config`, and needs
+# no key list here.
+#
+# The four exclusions, each because the key is not viewer state that survives:
+#   CONTROL  - per-show instructions (timeit, render_normals, reset_camera).
+#              A viewer never reports them back; they are said once, per call.
+#   CAMERA   - position/quaternion/target/zoom are the camera *now*, carried by
+#              the camera policy in render.js, not restored as configuration.
+#   cad_width, height - the surface's geometry, decided by whoever owns the
+#              surface. See each host's exclude_keys, which runs both ways.
+#   edge_accuracy - a tessellation input, consumed before a viewer sees it.
+NOT_CONFIG = (*CONTROL, *CAMERA, "cad_width", "height", "edge_accuracy")
+
+CONFIG = {key: value for key, value in ALL.items() if key not in NOT_CONFIG}
+
 # The extras are keys the groups above already name, so they are taken
 # from the catalogue rather than spelled a second time: a typo here is a
 # KeyError, not a second spelling of a renderer option.

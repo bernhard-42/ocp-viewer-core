@@ -407,12 +407,19 @@ class WebSocketComms(Comms[None]):
         self._send(config, MessageType.CONFIG, self.call_port, timeit)
 
     def send_command(self, data, timeit: bool = False):
-        result = self._send(data, MessageType.COMMAND, self.call_port, timeit)
-        # A status reply arrives wrapped, because that is how the viewer's own
-        # status message is shaped on the wire.
+        return self._send(data, MessageType.COMMAND, self.call_port, timeit)
+
+    def status(self):
+        result = self._send("status", MessageType.COMMAND, self.call_port)
+        # The answer arrives wrapped, because that is how the viewer's own
+        # status message is shaped on the wire - the same frame it pushes
+        # unprompted when the user changes something.
         if isinstance(result, dict) and result.get("command") == "status":
             return result["text"]
         return result
+
+    def workspace_config(self):
+        return self._send("config", MessageType.COMMAND, self.call_port)
 
     def send_backend(self, data, timeit: bool = False) -> None:
         self._send(data, MessageType.BACKEND, self.call_port, timeit)

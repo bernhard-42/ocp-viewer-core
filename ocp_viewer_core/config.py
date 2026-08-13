@@ -2,8 +2,14 @@
 
 `Config` answers what a show is drawn with, from three sources - the workspace
 settings a host stores, the viewer's own reported state, and the defaults set
-in code. A host supplies two lists: the keys it stores, and the keys it may not
-be told because its surface decides them.
+in code, in that order of precedence, with a show's own keywords over all three.
+Neither of the first two is knowable from Python: the stored settings and the
+toolbar live outside this process, which is why they are asked for rather than
+kept - `Comms.workspace_config` and `Comms.status`.
+
+A host supplies one list, `exclude_keys`: the keywords it may not be told,
+because its surface decides them. Which of the viewer's report counts as
+configuration is `keys.CONFIG` and is not the host's to choose.
 """
 
 #
@@ -200,9 +206,8 @@ NOT_RESTORED_ON_RESET = ("collapse",)
 
 
 class Config:
-    def __init__(self, session: Session, workspace_config_keys, exclude_keys):
+    def __init__(self, session: Session, exclude_keys):
         self.session = session
-        self.workspace_config_keys = workspace_config_keys
         self.exclude_keys = exclude_keys
 
         # Each group maps the Python name to the name three-cad-viewer knows the
@@ -324,9 +329,15 @@ class Config:
         """Set default value for key"""
         return self.get_default(key) if value is None else value
 
-    def workspace_filter(self, conf):
-        """Filter out all non-workspace keys from the config dict"""
-        return {k: v for k, v in conf.items() if k in self.workspace_config_keys}
+    def config_filter(self, conf):
+        """Keep the parts of a viewer's report that are configuration.
+
+        Named for what it does. It was `workspace_filter` over a host-supplied
+        `workspace_config_keys`, which read as "the keys this host persists" and
+        was never that: the set is `keys.CONFIG`, a property of the renderer's
+        state vocabulary, and all three hosts passed the identical list.
+        """
+        return {k: v for k, v in conf.items() if k in keys.CONFIG}
 
     def status(self, debug=False):
         """Get viewer status"""
@@ -396,7 +407,7 @@ class Config:
         use_status = not wspace_config.get("_splash", False)
 
         if use_status:
-            wspace_config.update(self.workspace_filter(wspace_status))
+            wspace_config.update(self.config_filter(wspace_status))
 
         wspace_config.update(self.defaults)
 

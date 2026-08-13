@@ -39,7 +39,7 @@ A host wires them together once, at import:
 ```python
 comms   = MyComms()                                    # the only class the host writes
 session = Session(comms)
-config  = Config(session, WORKSPACE_CONFIG_KEYS, EXCLUDE_KEYS)
+config  = Config(session, EXCLUDE_KEYS)
 viewer  = Viewer[MyHandle](config)
 
 show, show_object, show_all = viewer.show, viewer.show_object, viewer.show_all
@@ -105,10 +105,11 @@ The keywords and the cached answers have exactly one lifetime between them, whic
 
 ### `Config` — defaults, precedence, enums
 
-`ocp_viewer_core/config.py`. A host supplies two lists at construction:
+`ocp_viewer_core/config.py`. A host supplies **one** list at construction:
 
-- **`workspace_config_keys`** — the keys of the viewer's own reported state that survive into the next show. It has to name every key the user can change from the toolbar, not merely the keys the host stores in settings; a shorter list lets a second `show()` reset the user's toolbar to the workspace defaults.
 - **`exclude_keys`** — the keywords this host may not be told, because its surface decides them.
+
+It used to supply a second, `workspace_config_keys`, and that was a mistake worth recording. The name said "the keys this host persists"; the code used it for something else entirely — which of the viewer's *reported state* survives into the next show — and all three hosts passed the identical 61-key tuple, because that set is a property of three-cad-viewer's state vocabulary and never of a host's settings. It is now **`keys.CONFIG`**, derived as `keys.ALL` minus the control keys (said once per show, never reported back), the camera (carried by the camera policy), `cad_width`/`height` (the surface's own) and `edge_accuracy` (consumed before a viewer sees it). What a host actually persists needs no key list at all: it answers with values, from `Comms.workspace_config()`.
 
 **`exclude_keys` runs in opposite directions between hosts, which is the clearest argument for it being per host at all.** ocp_vscode and ocp_viewer exclude `cad_width` and `height` — a panel and a browser window decide their own geometry — and exclude `viewer`, `anchor` and `pinning`, which name a sidecar they do not have. Jupyter CadQuery excludes none of those, because a cell asks for a widget of a given size; it excludes `port` instead, since a sidecar is named, not dialled.
 
@@ -116,7 +117,7 @@ The precedence, in `combined_config`:
 
 ```
 workspace config          (what the host stores)
-  ← overlaid by the viewer's reported status, filtered to workspace_config_keys, but only when _splash is False
+  ← overlaid by the viewer's reported status, filtered to keys.CONFIG, but only when _splash is False
   ← overlaid by the defaults set in code   (Config.defaults)
 ```
 
@@ -497,7 +498,7 @@ A connection per message rather than one held open, which is the golden master's
 
 `ocp_vscode/config.py` builds the trio and binds the names; `ocp_vscode/show.py` builds `Viewer[None](config)` and binds the show family. `H` is `None` because the webview hands nothing back, so `show()` returns `None`, as it always has.
 
-`WORKSPACE_CONFIG_KEYS` is 61 keys — every toggle, clip, zebra and studio key the toolbar can change. `EXCLUDE_KEYS` is `("cad_width", "height", "viewer", "anchor", "pinning")`.
+`EXCLUDE_KEYS` is `("cad_width", "height", "viewer", "anchor", "pinning")`. The 61 keys of the viewer's state that survive a show are `keys.CONFIG` and are no longer this host's to state.
 
 The small entry points — `status`, `workspace_config`, `combined_config`, `get_defaults`, `reset_defaults` and the rest — keep the `port=` keyword they have always taken and open the scope around the call themselves. They **wrap rather than nest**: the core's own calls between its methods (`combined_config` asking itself for `status`) go straight to the methods and never back through these, so no scope is opened twice.
 

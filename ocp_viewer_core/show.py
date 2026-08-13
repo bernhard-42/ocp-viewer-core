@@ -658,8 +658,8 @@ class Viewer(Generic[H]):
 
         # `params["states"]` is normally populated from `conf["states"]` (the
         # user's current tree selections, pulled from status() via combined_config
-        # — see the host's workspace_config_keys). This preserves interactive
-        # deselections across show() calls.
+        # — see keys.CONFIG, which is what survives that filter). This preserves
+        # interactive deselections across show() calls.
         #
         # If the user passed `modes=`, override with mode-derived states so the
         # tree visibility actually reflects the requested render modes.
