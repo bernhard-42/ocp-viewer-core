@@ -203,6 +203,10 @@ class Session(Generic[H]):
         self.comms = comms
         self._status = None
         self._workspace_config = None
+        # Whether a show is in flight. The cache exists to stop one show asking
+        # the same question six times; outside a show there is no such run of
+        # questions, and answering from it is answering with the past.
+        self._in_show = False
 
     def begin(self, keywords: Any) -> None:
         """Open a call's scope: the transport hears this call's keywords.
@@ -224,14 +228,33 @@ class Session(Generic[H]):
         """
         self._status = None
         self._workspace_config = None
+        self._in_show = True
         self.comms.begin(keywords)
 
     def status(self) -> Any:
+        """The viewer's live state, asked once per show and freshly otherwise.
+
+        **Cached only while a show is in flight.** A user calling `status()` at
+        the prompt is asking what the viewer looks like *now*: they toggle
+        something in the viewer and ask again, and an answer from the cache is
+        the state before they touched it. That cache was emptied only at the end
+        of the next show, so it could be arbitrarily old - reported as "status()
+        only reports stale values, independent of what I set in the viewer UI".
+        """
+        if not self._in_show:
+            return self.comms.status()
         if self._status is None:
             self._status = self.comms.status()
         return self._status
 
     def workspace_config(self) -> Any:
+        """The host's stored settings, on the same terms as `status`.
+
+        A settings dialog can be open while Python sits at a prompt, so the same
+        argument applies: outside a show, ask.
+        """
+        if not self._in_show:
+            return self.comms.workspace_config()
         if self._workspace_config is None:
             self._workspace_config = self.comms.workspace_config()
         return self._workspace_config
@@ -253,6 +276,7 @@ class Session(Generic[H]):
         """
         self._status = None
         self._workspace_config = None
+        self._in_show = False
         self.comms.end()
 
     def send_data(self, data: Any, timeit: bool = False) -> H:
