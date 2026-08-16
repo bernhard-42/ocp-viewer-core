@@ -218,7 +218,22 @@ export function createRenderer({ viewer, status, overrides, resize, sendStatus, 
             viewerOptions.tab = config.tab;
         }
 
-        viewer.render(meshData, renderOptions, viewerOptions);
+        // The envelope when it is the instanced format, the tree otherwise.
+        //
+        // A host that received base64 hands over `{instances, shapes}` and the
+        // renderer decodes and resolves it itself. A host that decoded its own
+        // buffers - build123d Studio reads raw arrays off a binary frame and
+        // builds typed-array views onto it with no copy - cannot go that way:
+        // `decodeBuffer` base64-decodes unconditionally. It resolves the refs
+        // itself, with the renderer's own `resolveInstances`, and hands over a
+        // plain tree.
+        //
+        // Passing the envelope regardless is what broke that host: with no
+        // `instances` beside them, the shapes went in as an object with no
+        // `parts`, and the walk died on `id.replaceAll` of undefined - after
+        // clear() had already taken the previous model off the screen.
+        const instanced = Array.isArray(meshData.instances);
+        viewer.render(instanced ? meshData : shapes, renderOptions, viewerOptions);
 
         if (config.treeWidth && resize) {
             resize();
