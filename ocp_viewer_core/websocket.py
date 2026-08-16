@@ -307,10 +307,20 @@ class WebSocketComms(Comms[None]):
                 )
                 # set some dummy values to avoid errors
                 return dict(NO_VIEWER_CONFIG)
-            except Exception as ex:  # noqa: BLE001
-                comms_warning(f"Unexpected error: {ex}\n{traceback.format_exc()}")
-                # set some dummy values to avoid errors
-                return dict(NO_VIEWER_CONFIG)
+            except Exception:  # noqa: BLE001
+                # A bug, not a transport condition, so it must not share
+                # `comms_warning`'s once-per-session gate: after a connection
+                # warning had fired, this branch printed nothing at all, and a
+                # defect became a silently wrong configuration. `print` every
+                # time, with the traceback - a bug deserves a wall of output.
+                #
+                # The fallback config is only for COMMAND, whose callers read
+                # the answer; `send_data`/`send_config`/`send_backend` discard
+                # it, and handing them a config pretends the send worked.
+                print(f"Unexpected error talking to the viewer:\n{traceback.format_exc()}")
+                if message_type == MessageType.COMMAND:
+                    return dict(NO_VIEWER_CONFIG)
+                return None
 
         return result
 
