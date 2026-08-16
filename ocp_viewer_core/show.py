@@ -704,14 +704,9 @@ class Viewer(Generic[H]):
             print("\ntessellation parameters:\n", params)
 
         with Timer(timeit, "", "tessellate", 1):
-            # `instances` is rebound to the tessellated form here. The ignore is
-            # ocp_vscode's own and the reason is upstream: tessellate_group's
-            # return annotation declares a four-tuple and it returns three. The
-            # real fix belongs in ocp-tessellate.
-            instances, shapes, mapping = (  # ty:ignore[invalid-assignment]
-                tessellate_group(
-                    part_group, instances, params, progress, params.get("timeit", False)
-                )
+            # `instances` is rebound to the tessellated form here.
+            instances, shapes, mapping = tessellate_group(
+                part_group, instances, params, progress, params.get("timeit", False)
             )
 
         # `params["states"]` is normally populated from `conf["states"]` (the
