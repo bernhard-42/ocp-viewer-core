@@ -102,13 +102,16 @@ def get_properties(shape):
     refpoint = None
     sections = []
 
-    if shape_type == "Vertex":
+    # The dispatch repeats get_shape_type's tests rather than comparing its
+    # string: the predicates are TypeIs, so each branch holds the exact
+    # TopoDS subtype its calls require. `is_vector` is not repeated - nothing
+    # wrapped survives the downcast above.
+    if is_topods_vertex(shape):
         pt = get_point(shape)
         refpoint = pt
         sections.append({"xyz": pt})
 
-    elif shape_type == "Edge":
-        shape = downcast(shape)
+    elif is_topods_edge(shape):
         geom_section = {}
         pos_section = {}
 
@@ -199,8 +202,7 @@ def get_properties(shape):
                 pass
         sections.append(meas_section)
 
-    elif shape_type == "Face":
-        shape = downcast(shape)
+    elif is_topods_face(shape):
         geom_section = {}
 
         if geom_type == "Plane":
@@ -270,8 +272,11 @@ def get_properties(shape):
             pass
         sections.append(meas_section)
 
-    elif shape_type in ["Solid", "CompSolid", "Compound"]:
-        shape = downcast(shape)
+    elif (
+        is_topods_solid(shape)
+        or is_topods_compsolid(shape)
+        or is_topods_compound(shape)
+    ):
         sections.append({"volume": volume(shape)})
         refpoint = center_of_mass(shape)
 
