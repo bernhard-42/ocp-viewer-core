@@ -36,11 +36,43 @@ resolved names are the chosen host's own bound methods.
 
 from ._version import __version__
 
+# The names this package owns itself: the value vocabulary the functions
+# below take - `set_defaults(reset_camera=Camera.KEEP)` is unwritable
+# without them. Hosts re-export these from here, so they mean one thing in
+# every environment, and resolving one must never choose a host: a name
+# with a single answer is served from its defining submodule, prompt-free
+# even where several hosts are installed.
+_CORE_OWNED = {
+    "AnalysisTool": "config",
+    "BaseColorMap": "colors",
+    "Camera": "config",
+    "Collapse": "config",
+    "ColorMap": "colors",
+    "Render": "config",
+    "StudioBackground": "config",
+    "StudioEnvironment": "config",
+    "StudioTextureMapping": "config",
+    "StudioToneMapping": "config",
+    "UiTab": "config",
+    "web_to_rgb": "colors",
+}
+
 # The shared vocabulary: the intersection of the hosts' public names,
-# measured 2026-08-16. Everything here exists in every host, so a script
-# using only these runs unchanged under any of them - which is what makes
-# the star import safe to write.
+# measured 2026-08-16, plus the core-owned values above. Everything here
+# exists in every host, so a script using only these runs unchanged under
+# any of them - which is what makes the star import safe to write.
 __all__ = [
+    "AnalysisTool",
+    "BaseColorMap",
+    "Camera",
+    "Collapse",
+    "ColorMap",
+    "Render",
+    "StudioBackground",
+    "StudioEnvironment",
+    "StudioTextureMapping",
+    "StudioToneMapping",
+    "UiTab",
     "__version__",
     "combined_config",
     "get_default",
@@ -58,6 +90,7 @@ __all__ = [
     "show_object",
     "show_objects",
     "status",
+    "web_to_rgb",
     "workspace_config",
 ]
 
@@ -96,6 +129,14 @@ def __getattr__(name):
     have. The import of `host` lives here and not at the top so that a bare
     `import ocp_viewer_core` keeps importing nothing.
     """
+    if name in _CORE_OWNED:
+        # Our own name: import its submodule, not a host. Lazy for the same
+        # reason as the host path - a bare import keeps loading nothing.
+        from importlib import import_module
+
+        value = getattr(import_module(f".{_CORE_OWNED[name]}", __name__), name)
+        globals()[name] = value
+        return value
     if name in __all__ or name in _HOST_ONLY:
         from . import host
 
