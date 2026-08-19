@@ -371,8 +371,18 @@ export function createPage({
             }
         } else if (data.type === "backend_response") {
             viewer.handleBackendResponse(data);
-        // And no `init` branch, which was the third of the same kind and the
-        // worst: it called `init(data.paths, data.settings)`, a name this
+        } else if (data.type === "clear") {
+            // Python's `show_clear()`, and `show_all()` when it finds nothing
+            // drawable. clear() is a no-op on a viewer that shows nothing, and
+            // the stored model goes with the scene - a cleared model must not
+            // be resurrectable by anything that re-renders `_meshData`.
+            if (viewer != null) {
+                viewer.clear();
+                _meshData = null;
+                _shapes = null;
+            }
+        // No `init` branch, which was one of two of the same kind and the
+        // worse: it called `init(data.paths, data.settings)`, a name this
         // module never defines. Only the extension sends an `init` message,
         // and `viewer.html`'s own listener answers it - by *calling*
         // `createPage`, so this listener does not exist yet when the first one
@@ -380,8 +390,8 @@ export function createPage({
         // ReferenceError. Deleting it also removes the one branch that could
         // not work from a host driving `handleMessage` directly.
         //
-        // No `clear` or `show` branch: nothing in any host sends either, and
-        // `show` was a landmine rather than merely dead - `showViewer()` with
+        // No `show` branch: nothing in any host sends it, and it was a
+        // landmine rather than merely dead - `showViewer()` with
         // no arguments evaluates `getDisplayOptions(config.theme)` against an
         // undefined config and throws before reaching its own null guard, and
         // it assigns `_meshData = undefined` on the way, destroying the stored
