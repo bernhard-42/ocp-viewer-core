@@ -46,11 +46,6 @@ dev = ["build", "bump-my-version", "black", "pytest", "twine"]
 where = ["."]
 include = ["ocp_viewer_core*"]
 
-# PEP 561: the stub that makes the universal import visible to checkers, and
-# the marker that tells them to read it. setuptools ships neither by default.
-[tool.setuptools.package-data]
-ocp_viewer_core = ["py.typed", "*.pyi"]
-
 # ruff and ty are the whole toolchain: `ruff check` lints, `ty check` types, and
 # nothing reformats. A formatter was dropped deliberately - black rewrapped a
 # line onto two and carried the trailing `# noqa` onto the wrong one, where it
