@@ -302,7 +302,11 @@ export function createPage({
      * function rather than a listener body.
      */
     function resize() {
-        if (viewer != null) {
+        // `ready` and not only null: clear() returns the viewer to its
+        // never-rendered state, where resizeCadView throws - a splitter drag
+        // over an emptied pane must not be an error. The next show measures
+        // the surface for itself, so a skipped resize here loses nothing.
+        if (viewer != null && viewer.ready === true) {
             const displayOptions = getDisplayOptions(_config.theme);
             viewer.resizeCadView(
                 displayOptions.cadWidth,
@@ -399,6 +403,14 @@ export function createPage({
         // ever needs to re-render what it already has, that is `showViewer(
         // _meshData, _config)` guarded on `_meshData` being present.
         } else if (data.type === "ui") {
+            // Nothing on screen is a normal state now that show_clear exists,
+            // and most setters read the rendered scene and throw without one.
+            // Said rather than silent: in this ecosystem a dropped config is
+            // the hardest thing to debug.
+            if (viewer == null || viewer.ready !== true) {
+                debugLog("ui: no model on screen, config not applied");
+                return;
+            }
             if (_config["_splash"]) {
                 return;
             }
