@@ -7,6 +7,8 @@ The shared half of the OCP viewer ecosystem: one show suite, one tessellation, o
 - **Jupyter CadQuery** — through cad-viewer-widget
 - **build123d Studio**
 
+![viewer ecosystem](./docs/assets/viewer-ecosystem.png)
+
 Published as one project under one version to two registries: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. The two are shipped and versioned together, so which version of the pair a host has is one question rather than two.
 
 ## The idea
@@ -14,10 +16,6 @@ Published as one project under one version to two registries: `ocp-viewer-core` 
 Each host provides a `Comms` — a Python encoder and a JavaScript decoder, shipped as a pair — and a settings source. Everything above that is shared and knows nothing about which host it is running in. **No host is nameable inside this package**: no `port=`/`viewer=` pairs, no `is_jupyter_cadquery`, no environment sniffing, and no host name in a string. A conformance kit enforces that by running the shared half end to end over an in-memory loopback with no host at all.
 
 Per-host imports stay per host: `from ocp_vscode import show` beside `from build123d_studio import show`. A single universal import with the host discovered at runtime is deliberately not offered — it is how a `show()` once silently drew into somebody else's viewer.
-
-## Status
-
-Early development. Nothing here is published, and the API changes without notice until the first host adopts it.
 
 ## Layout
 
@@ -27,7 +25,7 @@ Early development. Nothing here is published, and the API changes without notice
 | `ocp_viewer_core/config.py` | the config keys, each mapped to the name three-cad-viewer knows it by, and the precedence over them |
 | `ocp_viewer_core/comms.py`  | the transport a host implements, and the session that caches what it answers                        |
 | `ocp_viewer_core/logo.py`   | the splash logo as measurable geometry, for a host's measurement backend                            |
-| `js/src/logo.js`            | the splash logo as tessellated data plus its config, for the renderer                                |
+| `js/src/logo.js`            | the splash logo as tessellated data plus its config, for the renderer                               |
 | `js/`                       | the JavaScript half, published to npm                                                               |
 | `tests/`                    | including the conformance kit                                                                       |
 
@@ -35,12 +33,7 @@ Early development. Nothing here is published, and the API changes without notice
 
 ## Use
 
-### ocp vscode:
-
-A host writes one class and supplies one list. `exclude_keys` names the keywords
-it may not be told, because its surface decides them - the show signature is the
-superset of every host's, so a keyword one host owns is a keyword another has to
-refuse by name rather than ignore.
+A host writes one class and supplies one list. `exclude_keys` names the keywords it may not be told, because its surface decides them - the show signature is the superset of every host's, so a keyword one host owns is a keyword another has to refuse by name rather than ignore.
 
 ```python
 comms = MyComms()
@@ -49,11 +42,7 @@ config = Config(session, ("cad_width", "height"))
 show(objects)
 ```
 
-What a host *persists* between sessions is its own business and needs no key
-list here: it answers with values, from `Comms.workspace_config()`. Which of the
-viewer's reported state counts as configuration - and so survives into the next
-show - is `keys.CONFIG`, derived from the vocabulary, because that set is a
-property of three-cad-viewer's state and not of any host's settings.
+What a host _persists_ between sessions is its own business and needs no key list here: it answers with values, from `Comms.workspace_config()`. Which of the viewer's reported state counts as configuration - and so survives into the next show - is `keys.CONFIG`, derived from the vocabulary, because that set is a property of three-cad-viewer's state and not of any host's settings.
 
 ## Dependencies
 
