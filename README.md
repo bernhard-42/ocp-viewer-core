@@ -2,6 +2,8 @@
 
 The shared half of the OCP viewer ecosystem: one show suite, one tessellation, one set of config semantics, used by four viewers that each keep their own transport and their own settings storage.
 
+Currently supported hosts (viewers):
+
 - **ocp_vscode** — the VS Code extension and its Python client
 - **ocp_viewer** — the standalone viewer, `python -m ocp_viewer`
 - **Jupyter CadQuery** — through cad-viewer-widget
@@ -13,9 +15,14 @@ Published as one project under one version to two registries: `ocp-viewer-core` 
 
 ## The idea
 
-Each host provides a `Comms` — a Python encoder and a JavaScript decoder, shipped as a pair — and a settings source. Everything above that is shared and knows nothing about which host it is running in. **No host is nameable inside this package**: no `port=`/`viewer=` pairs, no `is_jupyter_cadquery`, no environment sniffing, and no host name in a string. A conformance kit enforces that by running the shared half end to end over an in-memory loopback with no host at all.
+Each host provides a `Comms` — a Python encoder and a JavaScript decoder, shipped as a pair — and a settings source. Everything above that is shared and knows nothing about which host it is running in.
 
-Per-host imports stay per host: `from ocp_vscode import show` beside `from build123d_studio import show`. A single universal import with the host discovered at runtime is deliberately not offered — it is how a `show()` once silently drew into somebody else's viewer.
+Per-host imports stay per host:
+
+- `from ocp_vscode       import *` or `from ocp_vscode import       show, set_defaults`
+- `from build123d_studio import *` or `from build123d_studio import show, set_defaults`
+- `from jupyter_cadquery import *` or `from jupyter_cadquery import show, set_defaults`
+- `from ocp_viewer       import *` or `from ocp_viewer import       show, set_defaults`
 
 ## Layout
 
