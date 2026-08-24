@@ -19,10 +19,10 @@ Each host provides a `Comms` — a Python encoder and a JavaScript decoder, ship
 
 Per-host imports stay per host:
 
-- `from ocp_vscode       import *` or `from ocp_vscode import       show, set_defaults`
+- `from ocp_vscode       import *` or `from ocp_vscode       import show, set_defaults`
 - `from build123d_studio import *` or `from build123d_studio import show, set_defaults`
 - `from jupyter_cadquery import *` or `from jupyter_cadquery import show, set_defaults`
-- `from ocp_viewer       import *` or `from ocp_viewer import       show, set_defaults`
+- `from ocp_viewer       import *` or `from ocp_viewer       import show, set_defaults`
 
 ## Layout
 
