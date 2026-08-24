@@ -4,10 +4,10 @@ The shared half of the OCP viewer ecosystem: one show suite, one tessellation, o
 
 Currently supported hosts (viewers):
 
-- **ocp_vscode** — the VS Code extension and its Python client
-- **ocp_viewer** — the standalone viewer, `python -m ocp_viewer`
-- **Jupyter CadQuery** — through cad-viewer-widget
-- **build123d Studio**
+- [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer) — the VS Code extension
+- [ocp_viewer](https://github.com/bernhard-42/ocp-viewer) — the standalone viewer, `python -m ocp_viewer`
+- [Jupyter CadQuery](https://github.com/bernhard-42/jupyter-cadquery) — The viewer for Jupyter Lab through [cad-viewer-widget](https://github.com/bernhard-42/cad-viewer-widget)
+- [build123d Studio](https://github.com/bernhard-42/build123d-studio) — The standalone app based on [neutralinojs](https://neutralino.js.org/)
 
 ![viewer ecosystem](./docs/assets/viewer-ecosystem.png)
 
@@ -53,7 +53,10 @@ What a host _persists_ between sessions is its own business and needs no key lis
 
 ## Dependencies
 
-`ocp-tessellate` for tessellation, and `three-cad-viewer` as a peer dependency of the JavaScript half. **No OCP provider is declared** — the same `OCP` namespace is supplied by `cadquery_ocp`, `cadquery_ocp_novtk` and conda's `OCP`, and naming one would break users of the other two. The host or the user chooses.
+- The Python package [ocp-tessellate](https://github.com/bernhard-42/ocp-tessellate) for tessellation of [OCP based CAD objects](https://github.com/cadquery/OCP)
+- The Javascript package [three-cad-viewer](https://github.com/bernhard-42/three-cad-viewer), the actual viewer component.
+
+No OCP provider is declared — the same `OCP` namespace is supplied by `cadquery_ocp`, `cadquery_ocp_novtk` and conda's `OCP`, and naming one would break users of the other two. The host or the user chooses.
 
 ## Licence
 
