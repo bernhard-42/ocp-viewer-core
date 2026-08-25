@@ -71,7 +71,7 @@ upload_test:
 	@twine upload --repository testpypi dist/*
 
 upload:
-	@twine upload dist/*
+	@twine upload dist/*.whl dist/*.tar.gz
 
 release:
 	git add .

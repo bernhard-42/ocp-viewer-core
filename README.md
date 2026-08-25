@@ -11,6 +11,8 @@ Currently supported hosts (viewers):
 
 ![viewer ecosystem](./docs/assets/viewer-ecosystem.png)
 
+The user-facing documentation of the shared behavior — the show commands, the config system, the viewer window and its tools — lives in [docs/](./docs/index.md). Each host documents only its own specifics and refers there for the rest.
+
 Published as one project under one version to two registries: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. The two are shipped and versioned together, so which version of the pair a host has is one question rather than two.
 
 ## The idea

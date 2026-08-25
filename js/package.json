@@ -1,6 +1,6 @@
 {
   "name": "ocp-viewer-core",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Shared viewer policy for ocp_vscode, ocp_viewer, Jupyter CadQuery and build123d Studio",
   "type": "module",
   "main": "src/index.js",
