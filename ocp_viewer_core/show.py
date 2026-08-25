@@ -62,6 +62,7 @@ from ocp_tessellate.ocp_utils import (
 from ocp_tessellate.utils import Color, Timer, numpy_to_buffer_json
 from threejs_materials import PbrProperties
 
+from .animation import Animation
 from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
@@ -532,6 +533,15 @@ class Viewer(Generic[H]):
     def get_last_paths(self):
         """The paths of the last tessellated tree, for the animation module."""
         return self.last_paths
+
+    def animation(self, assembly=None) -> Animation:
+        """An Animation over the objects of the last show.
+
+        A host exports this bound method as `Animation`, so that
+        `Animation()` reads as a constructor everywhere while the instance
+        knows which viewer it animates - the same shape as the show family.
+        """
+        return Animation(self, assembly)
 
     # =========================== Tessellation =========================== #
 

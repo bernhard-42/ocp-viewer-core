@@ -33,7 +33,9 @@ classifiers = [
 # a build123d one, and an isinstance needs the class. The bound is ocp_vscode's,
 # unchanged (vscode-ocp-cad-viewer/pyproject.toml:42), so nothing has to be
 # re-resolved when the host adopts the core.
-dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson", "threejs-materials>=1.2.0,<1.3.0"]
+# pillow is the animation module's: `save_as_gif` assembles the frames. Shared
+# functionality carries its dependency in the core rather than per host.
+dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson", "pillow", "threejs-materials>=1.2.0,<1.3.0"]
 
 [project.optional-dependencies]
 dev = ["build", "bump-my-version", "black", "pytest", "twine"]
