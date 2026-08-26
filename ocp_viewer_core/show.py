@@ -161,19 +161,20 @@ def is_drawable(obj):
     `list`, `tuple` or `dict` on sight, and a scope is full of lists of numbers:
     one of those reaches `_convert`, which produces a model with a header and no
     geometry, and three-cad-viewer does not come back from one - the application
-    it was found in had to be force-quit. A container is drawable when its
-    contents are, and an empty one is not.
+    it was found in had to be force-quit. A container is drawable when anything
+    in it is - the show pipeline filters the rest, exactly as it does for a
+    mixed list passed to `show` directly - and an empty one is not.
 
     It came from build123d Studio, which had written the recursive version for
     itself; this is the one place the golden master is deliberately not
     preserved.
     """
     if isinstance(obj, (list, tuple)):
-        return len(obj) > 0 and all(is_drawable(item) for item in obj)
+        return len(obj) > 0 and any(is_drawable(item) for item in obj)
     if isinstance(obj, dict):
         # By value: the keys become names in the viewer's tree, and a mapping of
         # shapes is an ordinary way to hold an assembly.
-        return len(obj) > 0 and all(is_drawable(item) for item in obj.values())
+        return len(obj) > 0 and any(is_drawable(item) for item in obj.values())
     if hasattr(obj, "wrapped") and (
         is_topods_shape(obj.wrapped)
         or is_topods_compound(obj.wrapped)
@@ -2042,7 +2043,7 @@ class Viewer(Generic[H]):
                         and hasattr(obj, "position")
                         and hasattr(obj, "direction")
                     )
-                    # A container is drawable when its contents are. Accepting
+                    # A container is drawable when anything in it is. Accepting
                     # any list on sight is what let a list of floats through.
                     or (isinstance(obj, (list, tuple, dict)) and is_drawable(obj))
                 ):
