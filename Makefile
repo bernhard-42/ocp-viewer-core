@@ -1,25 +1,45 @@
-.PHONY: clean bump install tests check dist wheel tarball check_dist upload_test upload release
+.PHONY: clean bump bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release
 
 PYCACHE := $(shell find . -name '__pycache__')
 EGGS := $(wildcard *.egg-info)
-CURRENT_VERSION := $(shell awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' pyproject.toml)
+PY_VERSION := $(shell awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-py.toml)
+JS_VERSION := $(shell awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-js.toml)
 
 clean:
 	@echo "=> Cleaning"
 	@rm -fr build dist $(EGGS) $(PYCACHE)
 
 # Version commands
+#
+# major.minor is the contract between the two halves and moves together
+# (`make bump part=minor`); the patch level is each half's own, so a fix on
+# one side ships without an artificial release of the other
+# (`make bump-py part=patch`, `make bump-js part=patch`). See Development.md.
 
-bump:
-	@echo Current version: $(CURRENT_VERSION)
+bump-py:
+	@echo Current Python version: $(PY_VERSION)
 ifdef part
-	bump-my-version bump $(part) --allow-dirty && grep current pyproject.toml
+	bump-my-version bump $(part) --config-file .bumpversion-py.toml --allow-dirty && grep current .bumpversion-py.toml
 else ifdef version
-	bump-my-version bump --allow-dirty --new-version $(version) && grep current pyproject.toml
+	bump-my-version bump --config-file .bumpversion-py.toml --allow-dirty --new-version $(version) && grep current .bumpversion-py.toml
 else
 	@echo "Provide part=major|minor|patch or version=x.y.z"
 	exit 1
 endif
+
+bump-js:
+	@echo Current JavaScript version: $(JS_VERSION)
+ifdef part
+	bump-my-version bump $(part) --config-file .bumpversion-js.toml --allow-dirty && grep current .bumpversion-js.toml
+else ifdef version
+	bump-my-version bump --config-file .bumpversion-js.toml --allow-dirty --new-version $(version) && grep current .bumpversion-js.toml
+else
+	@echo "Provide part=major|minor|patch or version=x.y.z"
+	exit 1
+endif
+
+bump: bump-py bump-js
+	@echo "Python: $$(awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-py.toml), JavaScript: $$(awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-js.toml)"
 
 # Development
 #
@@ -60,12 +80,12 @@ wheel:
 tarball:
 	@echo "=> Packing the JavaScript half"
 	@mkdir -p dist
-	@cd js && yarn pack --filename ../dist/ocp-viewer-core-v$(CURRENT_VERSION).tgz
+	@cd js && yarn pack --filename ../dist/ocp-viewer-core-v$(JS_VERSION).tgz
 
 check_dist:
 	@twine check dist/*.whl dist/*.tar.gz
 	@echo "=> Contents of the JavaScript tarball"
-	@tar tzf dist/ocp-viewer-core-v$(CURRENT_VERSION).tgz
+	@tar tzf dist/ocp-viewer-core-v$(JS_VERSION).tgz
 
 upload_test:
 	@twine upload --repository testpypi dist/*
@@ -76,5 +96,5 @@ upload:
 release:
 	git add .
 	git status
-	git diff-index --quiet HEAD || git commit -m "Latest release: $(CURRENT_VERSION)"
-	git tag -a v$(CURRENT_VERSION) -m "Latest release: $(CURRENT_VERSION)"
+	git diff-index --quiet HEAD || git commit -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
+	git tag -a v$(PY_VERSION) -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"

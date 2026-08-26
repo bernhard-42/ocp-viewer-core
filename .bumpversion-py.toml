@@ -1,0 +1,23 @@
+# The Python half's version. Bumped alone for a Python-only patch
+# (`make bump-py part=patch`); minor and major go through `make bump`,
+# which moves both halves. See Development.md.
+
+[tool.bumpversion]
+current_version = "1.0.1"
+commit = false
+tag = false
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+allow_dirty = true
+search = "{current_version}"
+replace = "{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "ocp_viewer_core/_version.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'

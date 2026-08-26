@@ -2,7 +2,7 @@
 
 `ocp-viewer-core` is the shared half of the OCP viewer ecosystem: one show pipeline, one set of configuration semantics, one camera policy, one page. Four viewers use it, and each supplies only what is genuinely its own — a transport, and a description of what its surface can be told.
 
-It is one project published to two registries under one version: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. The two are shipped and versioned together, so which version of the pair a host has is one question rather than two.
+It is one project published to two registries: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. Their major.minor is the contract and must match - everything that crosses the wire moves only with a minor bump of both - while the patch level is each half's own, so a one-sided fix ships alone. The pairing is checked at runtime: Python sends its version with every model, and the page warns when major.minor differ. See Development.md.
 
 The four hosts, and where each stands:
 
@@ -730,4 +730,4 @@ Nothing is broken by it. It is a consistency debt, parked deliberately.
 
 **`ty` uses whatever environment is active, and that is deliberate.** A checker that fails loudly in the wrong environment is the wanted behaviour, not something to configure away; with no environment it reports unresolved imports that are artefacts of having nowhere to look.
 
-`make dist` builds the wheel and the `yarn pack` tarball together, since the two halves ship as one version.
+`make dist` builds the wheel and the `yarn pack` tarball together; each half carries its own version (see Development.md), aligned at major.minor.

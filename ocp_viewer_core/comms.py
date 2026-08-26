@@ -31,6 +31,7 @@ import enum
 import os
 from typing import Any, Generic, TypeVar
 
+from ._version import __version__
 from .keys import to_javascript
 
 
@@ -291,7 +292,13 @@ class Session(Generic[H]):
         with its own keys, and walking it would be both wrong and expensive.
         """
         if isinstance(data, dict) and isinstance(data.get("config"), dict):
-            data = {**data, "config": self.comms.encode_config(data["config"])}
+            config = dict(self.comms.encode_config(data["config"]))
+            # The version handshake: major.minor of the two halves is the
+            # contract, the patch level is each half's own. Injected after the
+            # encoding, so the key arrives spelled exactly like this and the
+            # page can take it out again before applying the config.
+            config["_core_version"] = __version__
+            data = {**data, "config": config}
         return self.comms.send_data(data, timeit=timeit)
 
     def set_viewer(self, config: Any) -> None:

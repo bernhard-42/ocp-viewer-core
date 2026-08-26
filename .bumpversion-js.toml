@@ -1,0 +1,23 @@
+# The JavaScript half's version. Bumped alone for a JS-only patch
+# (`make bump-js part=patch`); minor and major go through `make bump`,
+# which moves both halves. See Development.md.
+
+[tool.bumpversion]
+current_version = "1.0.1"
+commit = false
+tag = false
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+allow_dirty = true
+search = "{current_version}"
+replace = "{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "js/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "js/src/version.js"
+search = 'VERSION = "{current_version}"'
+replace = 'VERSION = "{new_version}"'

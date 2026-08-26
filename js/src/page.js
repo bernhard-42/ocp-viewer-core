@@ -36,8 +36,39 @@ import { createNotifier } from "./notify.js";
 import { buildDisplayOptions, preset } from "./options.js";
 import { createRenderer } from "./render.js";
 import { currentStates, restoreStates } from "./states.js";
+import { VERSION } from "./version.js";
 
 const MIN_WIDTH = 450;
+
+// The version handshake: the Python half sends `_core_version` in every
+// model's config, and major.minor is the contract - the patch level is each
+// half's own. Warned once per page, loudly, because a contract mismatch shows
+// up as the vaguest of symptoms otherwise: an option that does nothing, a key
+// nobody answers.
+let versionWarned = false;
+
+function consumeCoreVersion(config, send) {
+    if (config == null || config._core_version === undefined) {
+        return;
+    }
+    const python = String(config._core_version);
+    delete config._core_version;
+    if (versionWarned) {
+        return;
+    }
+    const [pyMajor, pyMinor] = python.split(".");
+    const [jsMajor, jsMinor] = VERSION.split(".");
+    if (pyMajor !== jsMajor || pyMinor !== jsMinor) {
+        versionWarned = true;
+        const msg =
+            `ocp-viewer-core version mismatch: Python ${python}, JavaScript ${VERSION} - ` +
+            "major.minor must match; update the older side";
+        console.error(msg);
+        if (send != null) {
+            send("log", msg);
+        }
+    }
+}
 
 /**
  * Build the page.
@@ -322,6 +353,11 @@ export function createPage({
 
     function handleMessage(message) {
         var data = message;
+
+        // Before anything reads the config: take the Python half's version
+        // out of it and check the contract, so `_core_version` never reaches
+        // applyConfig as an unknown key.
+        consumeCoreVersion(data?.config, send);
 
         if (data.type === "logo") {
             // The splash lives in the core, so a host asks for it by name and

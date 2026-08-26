@@ -13,7 +13,7 @@ Currently supported hosts (viewers):
 
 The user-facing documentation of the shared behavior — the show commands, the config system, the viewer window and its tools — lives in [docs/](./docs/index.md). Each host documents only its own specifics and refers there for the rest.
 
-Published as one project under one version to two registries: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. The two are shipped and versioned together, so which version of the pair a host has is one question rather than two.
+Published as one project to two registries: `ocp-viewer-core` on PyPI for the Python half, `ocp-viewer-core` on npm for the JavaScript half. Their major.minor is the contract and must match; the patch level is each half's own, so a one-sided fix ships without an artificial release of the other half. See [Development.md](./Development.md).
 
 ## The idea
 

@@ -63,3 +63,6 @@ export { createNotifier, EVENT_KEYS } from "./notify.js";
 // The splash. Data rather than policy, and here for the same reason the policy
 // is: every client shows it, and four of them had their own copy.
 export { logo } from "./logo.js";
+
+// The JavaScript half's version, for the major.minor handshake with Python.
+export { VERSION } from "./version.js";
