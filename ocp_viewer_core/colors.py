@@ -35,6 +35,14 @@ from webcolors import name_to_rgb
 __all__ = [
     "BaseColorMap",
     "ColorMap",
+    "GoldenRatioColormap",
+    "ListedColorMap",
+    "SeededColormap",
+    "SegmentedColorMap",
+    "hex_to_rgb",
+    "hsv_mapper",
+    "matplotlib_mapper",
+    "random_rgb_mapper",
     "web_to_rgb",
 ]
 
