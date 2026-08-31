@@ -36,14 +36,6 @@ __all__ = [
 ]
 
 
-def _select_build123d(obj, indices, cls, getter):
-    pass
-
-
-def _select_cadquery(obj, indices, cls, getter):
-    pass
-
-
 def _warn_once(message):
     def decorator(func):
         # A closure flag rather than an attribute on the wrapper: the state is
@@ -63,8 +55,13 @@ def _warn_once(message):
     return decorator
 
 
-try:
-    import build123d as __bd
+def _ensure_build123d():
+    """Import build123d at the call and hand back the module and the selector.
+
+    Not a core dependency - the requirement surfaces here, when a build123d
+    object is actually selected on, never at import.
+    """
+    import build123d as bd
 
     def _select_build123d(obj, indices, cls, getter):
         if hasattr(obj, "part"):
@@ -81,17 +78,18 @@ try:
             object.topo_parent = obj
             result.append(object)
 
-        return __bd.ShapeList(result)
+        return bd.ShapeList(result)
 
-# Broad on purpose: a missing build123d is the normal case for a cadquery
-# user, and a half-broken install must degrade to "not available" rather
-# than break every host's import. The stub above then answers.
-except Exception:  # noqa: BLE001, S110
-    pass
+    return bd, _select_build123d
 
 
-try:
-    import cadquery as __cq
+def _ensure_cadquery():
+    """Import cadquery at the call and hand back the module and the selector.
+
+    Not a core dependency - the requirement surfaces here, when a cadquery
+    object is actually selected on, never at import.
+    """
+    import cadquery as cq
 
     def _select_cadquery(obj, indices, cls, getter):
         if len(obj.vals()) > 1:
@@ -111,9 +109,7 @@ try:
 
         return []
 
-# As above, for cadquery.
-except Exception:  # noqa: BLE001, S110
-    pass
+    return cq, _select_cadquery
 
 
 @_warn_once(
@@ -121,9 +117,11 @@ except Exception:  # noqa: BLE001, S110
 )
 def select_vertices(obj, indices):
     if is_build123d(obj) or is_build123d_shape(obj):
-        return _select_build123d(obj, indices, __bd.Vertex, get_vertices)
+        bd, _select = _ensure_build123d()
+        return _select(obj, indices, bd.Vertex, get_vertices)
     elif is_cadquery(obj) or is_cadquery_sketch(obj):
-        return _select_cadquery(obj, indices, __cq.Vertex, get_vertices)
+        cq, _select = _ensure_cadquery()
+        return _select(obj, indices, cq.Vertex, get_vertices)
     else:
         raise ValueError(f"Wrong obj {type(obj)}")
 
@@ -133,9 +131,11 @@ def select_vertices(obj, indices):
 )
 def select_edges(obj, indices):
     if is_build123d(obj) or is_build123d_shape(obj):
-        return _select_build123d(obj, indices, __bd.Edge, get_edges)
+        bd, _select = _ensure_build123d()
+        return _select(obj, indices, bd.Edge, get_edges)
     elif is_cadquery(obj) or is_cadquery_sketch(obj):
-        return _select_cadquery(obj, indices, __cq.Edge, get_edges)
+        cq, _select = _ensure_cadquery()
+        return _select(obj, indices, cq.Edge, get_edges)
     else:
         raise ValueError(f"Wrong obj {type(obj)}")
 
@@ -145,9 +145,11 @@ def select_edges(obj, indices):
 )
 def select_faces(obj, indices):
     if is_build123d(obj) or is_build123d_shape(obj):
-        return _select_build123d(obj, indices, __bd.Face, get_faces)
+        bd, _select = _ensure_build123d()
+        return _select(obj, indices, bd.Face, get_faces)
     elif is_cadquery(obj):
-        return _select_cadquery(obj, indices, __cq.Face, get_faces)
+        cq, _select = _ensure_cadquery()
+        return _select(obj, indices, cq.Face, get_faces)
     elif is_cadquery_sketch(obj):
         raise ValueError("select_faces not availbale for CadQuery sketches")
     else:
