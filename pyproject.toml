@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ocp-viewer-core"
-version = "1.0.2"
+version = "1.0.3"
 authors = [{ name = "Bernhard Walter", email = "b_walter@arcor.de" }]
 description = "Shared viewer core for ocp_vscode, ocp_viewer, Jupyter CadQuery and build123d Studio"
 readme = "README.md"
