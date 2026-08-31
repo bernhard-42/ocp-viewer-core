@@ -66,6 +66,7 @@ from .animation import Animation
 from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
+from .materials import vis_material_to_pbr
 
 # This module reaches OCP, through ocp_tessellate. That is why the package's
 # `__init__` does not import it: a host that only needs config or comms must not
@@ -282,6 +283,16 @@ def is_build123d_material(material):
     )
 
 
+# To avoid a dependency on cadquery
+def is_cadquery_material(material):
+    """Duck-type test for a cadquery Material, so the core need not import cadquery."""
+    return (
+        hasattr(material, "wrapped")
+        and hasattr(material, "wrapped_vis")
+        and hasattr(material, "density")
+    )
+
+
 class ShowProgress(Progress):
     """Progress indicator for tessellation"""
 
@@ -340,6 +351,7 @@ def _extract_materials_from_node(node, extracted, id_to_key, name_counts):
     - threejs-materials PbrProperties
     - py-materials Material
     - build123d Material
+    - cadquery Material (its XCAFDoc_VisMaterial, when it holds visual properties)
     """
     if isinstance(node, OcpGroup):
         for child in node.objects:
@@ -359,8 +371,24 @@ def _extract_materials_from_node(node, extracted, id_to_key, name_counts):
         elif is_build123d_material(node.material):
             mat = node.material.pbr
             node.normalize_uvs = mat.normalize_uvs
+
+        elif is_cadquery_material(node.material):
+            mat = vis_material_to_pbr(
+                node.material.wrapped_vis, name=node.material.name
+            )
+            if mat is None:
+                print(
+                    f"Material '{node.material.name}' has no visual properties, "
+                    "ignoring it"
+                )
+                node.material = None
+                return
+            node.normalize_uvs = mat.normalize_uvs
+
         else:
-            print(f"Unkonwn material {type(node.material)}")
+            print(f"Unknown material {type(node.material)}, ignoring it")
+            node.material = None
+            return
 
         mat_dict = mat.to_dict()
         mat_content_key = mat.to_json(sort_keys=True)
