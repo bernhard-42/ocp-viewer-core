@@ -24,7 +24,6 @@ import re
 import time
 import traceback
 import types
-import warnings
 from enum import Enum
 from logging import Logger
 from typing import Generic
@@ -67,6 +66,7 @@ from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
 from .materials import vis_material_to_pbr
+from .utils import camera_keep_warning, camera_warning, ignore_camera_warnings
 
 # This module reaches OCP, through ocp_tessellate. That is why the package's
 # `__init__` does not import it: a host that only needs config or comms must not
@@ -80,75 +80,6 @@ __all__ = [
     "ignore_camera_warnings",
     "none_filter",
 ]
-
-
-# ============================ Warnings ============================ #
-#
-# These stay module-level rather than becoming instance state, and deliberately:
-# `warnings` is a process-wide registry, and "warn once per session" means once
-# per process. Two Viewers in one process warning twice about the same thing
-# would be a regression, not isolation. Contrast the show state below, which is
-# per-Viewer precisely because two Viewers must not share a camera or a stack.
-
-
-class CameraWarning(UserWarning):
-    """Warning for potential camera visibility issues."""
-
-
-class CameraKeepWarning(UserWarning):
-    """Warning that reset camera is set to KEEP."""
-
-
-# Manual "once" handling below rather than warnings' own "once" filter: where one
-# process serves several clients, that filter would show the warning to whoever
-# triggered it first and silence it for everybody after.
-warnings.simplefilter("always", CameraWarning)
-warnings.simplefilter("always", CameraKeepWarning)
-
-_camera_keep_warning_shown = False
-
-
-def _warning_on_one_line(
-    message: Warning | str,
-    category: type[Warning],
-    filename: str,
-    lineno: int,
-    line: str | None = None,
-) -> str:
-    """Warnings on one line, without the source echo.
-
-    The signature matches `warnings.formatwarning`, which is what this replaces.
-    The version carried over from ocp_vscode had an extra `file=None` in fifth
-    position - a parameter `showwarning` has and `formatwarning` does not - so
-    the `line` argument was being bound to `file` on every call. Harmless only
-    because the body reads neither.
-    """
-    return f"{category.__name__}: {message}\n"
-
-
-def camera_warning(message):
-    """Issue a camera warning"""
-    # ty models warnings.formatwarning as a fixed function rather than a
-    # rebindable hook, so it rejects the assignment even though the two
-    # signatures are now identical. Replacing it is the documented way to
-    # change warning formatting.
-    warnings.formatwarning = _warning_on_one_line  # ty: ignore[invalid-assignment]
-    warnings.warn(message, CameraWarning, stacklevel=2)
-
-
-def camera_keep_warning(message):
-    """Issue a reset camera set to KEEP warning (only once per session)"""
-    global _camera_keep_warning_shown  # pylint: disable=global-statement
-    if not _camera_keep_warning_shown:
-        warnings.formatwarning = _warning_on_one_line  # ty: ignore[invalid-assignment]
-        warnings.warn(message, CameraKeepWarning, stacklevel=2)
-        _camera_keep_warning_shown = True
-
-
-def ignore_camera_warnings():
-    """Suppress all camera visibility warnings."""
-    warnings.filterwarnings("ignore", category=CameraWarning)
-    warnings.filterwarnings("ignore", category=CameraKeepWarning)
 
 
 def is_drawable(obj):

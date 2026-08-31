@@ -1,8 +1,9 @@
-"""Utility geometry, usable from every host: the shader ball for material demonstrations.
+"""Host-neutral utilities: the camera warnings and the shader ball.
 
-`from ocp_viewer_core.utils import create_shader_ball` is the import in any
-viewer's environment - the core is a dependency of all of them, so nothing
-per host is needed and no host binds the name at package level.
+`from ocp_viewer_core.utils import ignore_camera_warnings` matches where
+ocp_vscode's utils kept it; `create_shader_ball` is the shader ball for
+material demonstrations. The core is a dependency of every viewer, so
+nothing per host is needed and no host binds these names at package level.
 
 Built with build123d, which the core deliberately does not depend on - the
 pyproject names no CAD library for the same reason it names no OCP provider,
@@ -30,7 +31,86 @@ never is.
 # limitations under the License.
 #
 
-__all__ = ["create_shader_ball"]
+import warnings
+
+__all__ = [
+    "camera_keep_warning",
+    "create_shader_ball",
+    "ignore_camera_warnings",
+]
+
+
+# ============================ Warnings ============================ #
+#
+# These stay module-level rather than becoming instance state, and deliberately:
+# `warnings` is a process-wide registry, and "warn once per session" means once
+# per process. Two Viewers in one process warning twice about the same thing
+# would be a regression, not isolation. Contrast the show state in `show.py`,
+# which is per-Viewer precisely because two Viewers must not share a camera or
+# a stack.
+
+
+class CameraWarning(UserWarning):
+    """Warning for potential camera visibility issues."""
+
+
+class CameraKeepWarning(UserWarning):
+    """Warning that reset camera is set to KEEP."""
+
+
+# Manual "once" handling below rather than warnings' own "once" filter: where one
+# process serves several clients, that filter would show the warning to whoever
+# triggered it first and silence it for everybody after.
+warnings.simplefilter("always", CameraWarning)
+warnings.simplefilter("always", CameraKeepWarning)
+
+_camera_keep_warning_shown = False
+
+
+def _warning_on_one_line(
+    message: Warning | str,
+    category: type[Warning],
+    filename: str,
+    lineno: int,
+    line: str | None = None,
+) -> str:
+    """Warnings on one line, without the source echo.
+
+    The signature matches `warnings.formatwarning`, which is what this replaces.
+    The version carried over from ocp_vscode had an extra `file=None` in fifth
+    position - a parameter `showwarning` has and `formatwarning` does not - so
+    the `line` argument was being bound to `file` on every call. Harmless only
+    because the body reads neither.
+    """
+    return f"{category.__name__}: {message}\n"
+
+
+def camera_warning(message):
+    """Issue a camera warning"""
+    # ty models warnings.formatwarning as a fixed function rather than a
+    # rebindable hook, so it rejects the assignment even though the two
+    # signatures are now identical. Replacing it is the documented way to
+    # change warning formatting.
+    warnings.formatwarning = _warning_on_one_line  # ty: ignore[invalid-assignment]
+    warnings.warn(message, CameraWarning, stacklevel=2)
+
+
+def camera_keep_warning(message):
+    """Issue a reset camera set to KEEP warning (only once per session)"""
+    global _camera_keep_warning_shown  # pylint: disable=global-statement
+    if not _camera_keep_warning_shown:
+        warnings.formatwarning = _warning_on_one_line  # ty: ignore[invalid-assignment]
+        warnings.warn(message, CameraKeepWarning, stacklevel=2)
+        _camera_keep_warning_shown = True
+
+
+def ignore_camera_warnings():
+    """Suppress all camera visibility warnings."""
+    warnings.filterwarnings("ignore", category=CameraWarning)
+    warnings.filterwarnings("ignore", category=CameraKeepWarning)
+
+
+# ============================ Shader ball ============================ #
 
 
 def create_shader_ball(name="shader_ball"):
