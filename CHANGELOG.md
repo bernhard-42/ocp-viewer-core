@@ -2,6 +2,14 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.4 (unreleased)
+
+- `commands.py` is renamed to `viewer.py`: `from ocp_viewer_core.viewer import *` (or any named subset) is the portable spelling for multi-viewer scripts - it resolves the host from the environment and offers its complete flat surface, star-identical to `from <host> import *`.
+- The package root imports the light submodules - `animation`, `colors`, `comms`, `config`, `keys`, `state`, `utils` - so `dir(ocp_viewer_core)` and tab completion show the package structure. `utils` defers its build123d import to the `create_shader_ball` call, so no CAD library is required to import the package.
+- The camera warnings (`ignore_camera_warnings`, `camera_keep_warning` and their classes) moved from `show.py` to `utils.py`, matching where ocp_vscode kept them; `ocp_viewer_core.show` still re-exports them, so hosts are untouched.
+- `selectors.py` imports its CAD library at the call through `_ensure_build123d`/`_ensure_cadquery` - a missing library is an honest ImportError at the selection instead of a silent no-op, and importing the module no longer pays for whichever CAD libraries happen to be installed.
+- Every root submodule now has a complete `__all__`; `config`'s was empty, so `from ocp_viewer_core.config import *` yielded nothing where the nine enums were meant.
+
 ## Python v1.0.3 (2026-08-31)
 
 - New `materials.py`: `vis_material_to_pbr` and `pbr_to_vis_material` translate between OCCT's `XCAFDoc_VisMaterial` and threejs-materials' `PbrProperties` - scalar PBR values, with color spaces converted at the boundary (base color sRGB, emissive linear); texture maps and the fields `XCAFDoc_VisMaterialPBR` cannot hold are dropped.

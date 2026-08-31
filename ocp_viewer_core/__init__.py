@@ -10,7 +10,7 @@ The package import carries the light submodules - `animation`, `colors`,
 same structure a host's does. It costs the tessellator (and through it the
 OCP kernel, via `config` and `animation`), which every host loads anyway;
 the heavy pipeline - `show`, `backend`, `measure` - and `websocket` stay
-on demand, and `commands` is never imported from here: its environment
+on demand, and `viewer` is never imported from here: its environment
 sniffing is opt-in. `utils` defers its build123d import to the call of
 `create_shader_ball`, so no CAD library is required to import the package.
 
