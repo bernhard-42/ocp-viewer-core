@@ -35,6 +35,8 @@ import time
 from ocp_tessellate.utils import numpy_to_json
 from PIL import Image
 
+__all__ = ["Animation"]
+
 
 def _frame_times(n_frames, endpoint):
     """`n_frames` values from 0 to 1000, the counterpart of numpy's linspace.

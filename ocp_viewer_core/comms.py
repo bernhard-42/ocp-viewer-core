@@ -34,6 +34,8 @@ from typing import Any, Generic, TypeVar
 from ._version import __version__
 from .keys import to_javascript
 
+__all__ = ["Comms", "H", "MessageType", "Session", "is_pytest"]
+
 
 class MessageType(enum.IntEnum):
     """What a message on the wire is.

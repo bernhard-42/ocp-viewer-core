@@ -28,6 +28,15 @@ import os
 import time
 from pathlib import Path
 
+__all__ = [
+    "add_port",
+    "atomic_operation",
+    "del_port",
+    "get_config_file",
+    "get_ports",
+    "update_state",
+]
+
 # The name is a host's and stays one: this file is written by the VS Code
 # extension in TypeScript and read by every Python client to find a viewer, so
 # renaming it would strand every installation that already has one. What moved

@@ -36,7 +36,18 @@ from ocp_tessellate.utils import Color
 from . import keys
 from .comms import Session, is_pytest
 
-__all__ = []
+__all__ = [
+    "AnalysisTool",
+    "Camera",
+    "Collapse",
+    "Config",
+    "Render",
+    "StudioBackground",
+    "StudioEnvironment",
+    "StudioTextureMapping",
+    "StudioToneMapping",
+    "UiTab",
+]
 
 
 class Camera(Enum):
