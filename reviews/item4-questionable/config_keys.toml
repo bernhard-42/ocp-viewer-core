@@ -1,0 +1,974 @@
+# The config key table: one row per option, the single source both halves
+# generate from. It replaces five overlapping lists in ocp_vscode/config.py
+# (ui, workspace, control, keys, set) and viewer.html's toCamelCase, whose
+# failure mode is silence - a key whose JS name is not the mechanical
+# transform is ignored by the renderer and nothing says so.
+#
+# Columns needing human judgement are marked "# REVIEW". Bootstrapped from
+# ocp_vscode 4.0.2: package.json contributes (group, type, default,
+# persistent lifetime), standalone_defaults.py, and the five lists.
+
+[[key]]
+python = "ambient_intensity"
+js = "ambientIntensity"
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 1
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "analysis_tool"
+js = "analysisTool"
+group = ""
+role = "action"
+lifetime = "per-process"
+type = "string"
+default = ""  # unset
+kind = "event"
+replayable = false  # an action: replaying it from a snapshot re-fires it
+reportable = false
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "angular_tolerance"
+js = "angularTolerance"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "number"
+default = 0.2
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "axes"
+js = "axes"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = false
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "axes0"
+js = "axes0"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = true
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "black_edges"
+js = "blackEdges"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = false
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "center_grid"
+js = "centerGrid"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = false
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "clip_intersection"
+js = "clipIntersection"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "boolean"
+ts_type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_normal_0"
+js = "clipNormal0"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "Vector3Tuple"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_normal_1"
+js = "clipNormal1"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "Vector3Tuple"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_normal_2"
+js = "clipNormal2"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "Vector3Tuple"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_object_colors"
+js = "clipObjectColors"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "boolean"
+ts_type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_planes"
+js = "clipPlaneHelpers"  # not the mechanical transform
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "boolean"
+ts_type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_slider_0"
+js = "clipSlider0"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_slider_1"
+js = "clipSlider1"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "clip_slider_2"
+js = "clipSlider2"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "collapse"
+js = "collapse"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "string"
+ts_type = "number"
+default = "1"
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "dark"
+js = "dark"
+group = ""
+role = "command"
+lifetime = "persistent"
+type = "boolean"
+default = false
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "debug"
+js = "debug"
+group = ""
+role = "diagnostic"
+lifetime = "per-process"
+type = "boolean"
+default = false
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "default_color"
+js = "defaultColor"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "string"
+default = "#e8b024"
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "default_edgecolor"
+js = "edgeColor"  # not the mechanical transform
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "string"
+ts_type = "number"
+default = "#707070"
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "default_facecolor"
+js = "defaultFacecolor"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "string"
+default = "Violet"
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "default_opacity"
+js = "defaultOpacity"
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 0.5
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "default_thickedgecolor"
+js = "defaultThickedgecolor"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "string"
+default = "MediumOrchid"
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "default_vertexcolor"
+js = "defaultVertexcolor"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "string"
+default = "MediumOrchid"
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "deviation"
+js = "deviation"
+group = ""
+role = "tessellation"
+lifetime = "persistent"
+type = "number"
+default = 0.1
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "direct_intensity"
+js = "directIntensity"
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 1.1
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "edge_accuracy"
+js = "edgeAccuracy"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "number"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "explode"
+js = "explode"
+group = ""
+role = "action"
+lifetime = "persistent"
+type = "boolean"
+default = false
+kind = "event"
+replayable = false  # an action: replaying it from a snapshot re-fires it
+reportable = false
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "glass"
+js = "glass"
+group = "DisplayOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = true
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "grid"
+js = "grid"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "[boolean, boolean, boolean]"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "grid_font_size"
+js = "gridFontSize"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = 12
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "helper_scale"
+js = "helperScale"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "number"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "metalness"
+js = "metalness"
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 0.3
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "modifier_keys"
+js = "keymap"  # renamed, not the mechanical transform
+group = "DisplayOptions"
+role = "option"
+lifetime = "persistent"
+type = "object"
+ts_type = "Keymap"
+default = { shift = "shiftKey", ctrl = "ctrlKey", meta = "metaKey", alt = "altKey" }
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+note = "renamed, not a transform of the python name"
+
+[[key]]
+python = "orbit_control"
+js = "control"  # renamed, not the mechanical transform
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "ControlType"
+default = false
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+transform = "bool_to_enum"
+transform_true = "orbit"
+transform_false = "trackball"
+note = "python boolean becomes the renderer's ControlType string; show.py:522-523"
+
+[[key]]
+python = "ortho"
+js = "ortho"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = true
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "pan_speed"
+js = "panSpeed"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 1
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "position"
+js = "position"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "StateChange<Vector3Tuple>"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["set"]
+
+[[key]]
+python = "quaternion"
+js = "quaternion"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "StateChange<QuaternionTuple>"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["set"]
+
+[[key]]
+python = "render_joints"
+js = "renderJoints"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "render_mates"
+js = "renderMates"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "render_normals"
+js = "renderNormals"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "reset_camera"
+js = "resetCamera"
+group = ""
+role = "command"
+lifetime = "persistent"
+type = "string"
+default = "KEEP"
+kind = "event"
+replayable = false  # an action: replaying it from a snapshot re-fires it
+reportable = false
+lists = ["control", "keys", "set"]
+
+[[key]]
+python = "rotate_speed"
+js = "rotateSpeed"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 1
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "roughness"
+js = "roughness"
+group = "RenderOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 0.65
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "show_locals"
+js = "showLocals"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "show_parent"
+js = "showParent"
+group = ""
+role = "tessellation"
+lifetime = "per-process"
+type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "states"
+js = "states"
+group = ""
+role = "tree-state"
+lifetime = "per-process"
+type = "object"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "studio_4k_env_maps"
+js = "studio4kEnvMaps"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "boolean"
+ts_type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_ao_intensity"
+js = "studioAOIntensity"  # not the mechanical transform
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_background"
+js = "studioBackground"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "StudioBackground"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_env_intensity"
+js = "studioEnvIntensity"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_env_rotation"
+js = "studioEnvRotation"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_environment"
+js = "studioEnvironment"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "string"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_exposure"
+js = "studioExposure"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_shadow_intensity"
+js = "studioShadowIntensity"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_shadow_softness"
+js = "studioShadowSoftness"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_texture_mapping"
+js = "studioTextureMapping"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "StudioTextureMapping"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "studio_tone_mapping"
+js = "studioToneMapping"
+group = "StudioModeOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "StudioToneMapping"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "tab"
+js = "tab"
+group = "ViewerOptions"
+role = "action"
+lifetime = "per-process"
+type = "string"
+ts_type = "StateChange<ActiveTab | null>"
+default = ""  # unset
+kind = "event"
+replayable = false  # an action: replaying it from a snapshot re-fires it
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "target"
+js = "target"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "array"
+ts_type = "StateChange<Vector3Tuple>"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["set"]
+
+[[key]]
+python = "ticks"
+js = "ticks"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 5
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "timeit"
+js = "timeit"
+group = "ViewerOptions"
+role = "diagnostic"
+lifetime = "per-process"
+type = "boolean"
+ts_type = "boolean"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["control", "keys"]
+
+[[key]]
+python = "tools"
+js = "tools"
+group = "DisplayOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = true
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "transparent"
+js = "transparent"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "boolean"
+ts_type = "boolean"
+default = false
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys", "set"]
+
+[[key]]
+python = "tree_width"
+js = "treeWidth"
+group = "DisplayOptions"
+role = "option"
+lifetime = "persistent"
+type = "integer"
+ts_type = "number"
+default = 240
+kind = "state"
+reportable = false
+lists = ["workspace", "keys", "set"]
+
+[[key]]
+python = "up"
+js = "up"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "string"
+ts_type = "UpDirection"
+default = "Z"
+kind = "state"
+reportable = false
+lists = ["workspace", "keys"]
+
+[[key]]
+python = "zebra_color_scheme"
+js = "zebraColorScheme"
+group = "ZebraOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "ZebraColorScheme"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "zebra_count"
+js = "zebraCount"
+group = "ZebraOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "zebra_direction"
+js = "zebraDirection"
+group = "ZebraOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "zebra_mapping_mode"
+js = "zebraMappingMode"
+group = "ZebraOptions"
+role = "option"
+lifetime = "per-process"
+type = "string"
+ts_type = "ZebraMappingMode"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "zebra_opacity"
+js = "zebraOpacity"
+group = "ZebraOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "number"
+default = ""  # unset
+kind = "state"
+reportable = true
+lists = ["ui", "workspace", "keys"]
+
+[[key]]
+python = "zoom"
+js = "zoom"
+group = "ViewerOptions"
+role = "option"
+lifetime = "per-process"
+type = "number"
+ts_type = "StateChange<number>"
+default = ""  # unset
+kind = "state"
+reportable = false
+lists = ["keys", "set"]
+
+[[key]]
+python = "zoom_speed"
+js = "zoomSpeed"
+group = "ViewerOptions"
+role = "option"
+lifetime = "persistent"
+type = "number"
+ts_type = "number"
+default = 1
+kind = "state"
+reportable = true
+lists = ["workspace", "keys", "set"]
