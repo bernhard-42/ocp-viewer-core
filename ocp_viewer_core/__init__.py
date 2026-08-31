@@ -5,10 +5,14 @@ the measurement backend and the wire protocol, used by ocp_vscode, ocp_viewer,
 Jupyter CadQuery and build123d Studio. Each host supplies a transport and its
 own settings; everything above that is here.
 
-This module imports nothing. A host imports the submodule it needs, so that
-importing the package never loads the tessellator or OCP - `show`, `backend`
-and `measure` reach the kernel, and `comms`, `config`, `keys`, `state` and
-`websocket` do not.
+The package import carries the light submodules - `animation`, `colors`,
+`comms`, `config`, `keys`, `state`, `utils` - so the package root shows the
+same structure a host's does. It costs the tessellator (and through it the
+OCP kernel, via `config` and `animation`), which every host loads anyway;
+the heavy pipeline - `show`, `backend`, `measure` - and `websocket` stay
+on demand, and `commands` is never imported from here: its environment
+sniffing is opt-in. `utils` defers its build123d import to the call of
+`create_shader_ball`, so no CAD library is required to import the package.
 
 Users never import from here: everything a user calls comes from their
 viewer's own package (`from ocp_vscode import *`), and all four packages
@@ -38,6 +42,16 @@ viewer, and that is documentation, not a defect.
 # limitations under the License.
 #
 
+from . import animation, colors, comms, config, keys, state, utils
 from ._version import __version__
 
-__all__ = ["__version__"]
+__all__ = [
+    "__version__",
+    "animation",
+    "colors",
+    "comms",
+    "config",
+    "keys",
+    "state",
+    "utils",
+]

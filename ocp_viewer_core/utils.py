@@ -6,9 +6,12 @@ per host is needed and no host binds the name at package level.
 
 Built with build123d, which the core deliberately does not depend on - the
 pyproject names no CAD library for the same reason it names no OCP provider,
-because the host or the user chooses. The imports are at the top of this
-module anyway: importing `ocp_viewer_core.utils` is the statement "I have
-build123d", and a package import never pays for it.
+because the host or the user chooses. The import is inside the function,
+deliberately: this module is imported by the package `__init__`, so a
+top-level import would make every `import ocp_viewer_core` - and with it
+every host - require build123d, crashing a cadquery-only environment.
+Calling `create_shader_ball` is the statement "I have build123d"; importing
+never is.
 """
 
 #
@@ -27,26 +30,28 @@ build123d", and a package import never pays for it.
 # limitations under the License.
 #
 
-from build123d import (
-    Align,
-    CenterArc,
-    Compound,
-    Cone,
-    Cylinder,
-    Pos,
-    Rot,
-    SlotArc,
-    Sphere,
-    Triangle,
-    extrude,
-    fillet,
-)
-
 __all__ = ["create_shader_ball"]
 
 
 def create_shader_ball(name="shader_ball"):
     """A shader ball compound to demonstrate materials on"""
+    # Lazy on purpose - build123d is not a core dependency, and this module is
+    # imported by the package __init__. See the module docstring.
+    from build123d import (
+        Align,
+        CenterArc,
+        Compound,
+        Cone,
+        Cylinder,
+        Pos,
+        Rot,
+        SlotArc,
+        Sphere,
+        Triangle,
+        extrude,
+        fillet,
+    )
+
     ccm = (Align.CENTER, Align.CENTER, Align.MIN)
     cM = (Align.CENTER, Align.MAX)
 
