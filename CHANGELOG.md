@@ -2,7 +2,7 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
-## Python v1.0.3 (unreleased)
+## Python v1.0.3 (2026-08-31)
 
 - New `materials.py`: `vis_material_to_pbr` and `pbr_to_vis_material` translate between OCCT's `XCAFDoc_VisMaterial` and threejs-materials' `PbrProperties` - scalar PBR values, with color spaces converted at the boundary (base color sRGB, emissive linear); texture maps and the fields `XCAFDoc_VisMaterialPBR` cannot hold are dropped.
 - `show` accepts a cadquery `Material` and renders its vis material when it holds visual properties. Today it never does - cadquery's constructor stores only the physical half and its STEP importer reads only `XCAFDoc_Material` - so it is reported and ignored until cadquery populates `wrapped_vis`, or the user does via `pbr_to_vis_material`.
