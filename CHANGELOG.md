@@ -2,7 +2,7 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
-## Python v1.0.4 (unreleased)
+## Python v1.0.4 (2026-08-31)
 
 - `commands.py` is renamed to `viewer.py`: `from ocp_viewer_core.viewer import *` (or any named subset) is the portable spelling for multi-viewer scripts - it resolves the host from the environment and offers its complete flat surface, star-identical to `from <host> import *`.
 - The package root imports the light submodules - `animation`, `colors`, `comms`, `config`, `keys`, `state`, `utils` - so `dir(ocp_viewer_core)` and tab completion show the package structure. `utils` defers its build123d import to the `create_shader_ball` call, so no CAD library is required to import the package.
