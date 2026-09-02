@@ -7,12 +7,18 @@ own settings; everything above that is here.
 
 The package import carries the light submodules - `animation`, `colors`,
 `comms`, `config`, `keys`, `state`, `utils` - so the package root shows the
-same structure a host's does. It costs the tessellator (and through it the
-OCP kernel, via `config` and `animation`), which every host loads anyway;
-the heavy pipeline - `show`, `backend`, `measure` - and `websocket` stay
+same structure a host's does, and it stays kernel-free: importing the
+package must not load the tessellator or OCP. That property has a real
+consumer - build123d Studio's sidecar imports `comms` and `screenshot` and
+must not hold the kernel; its measurements run in a separate process
+precisely to keep OCP out - and 1.0.4 broke it, because `config` and
+`animation` imported `ocp_tessellate.utils` at the top, and any
+ocp_tessellate import runs its package __init__, which loads the kernel.
+Each now defers its single ocp_tessellate use to the call that needs it.
+The heavy pipeline - `show`, `backend`, `measure` - and `websocket` import
 on demand, and `viewer` is never imported from here: its environment
-sniffing is opt-in. `utils` defers its build123d import to the call of
-`create_shader_ball`, so no CAD library is required to import the package.
+sniffing is opt-in. `utils` likewise defers its build123d import to the
+call of `create_shader_ball`, so no CAD library is required either.
 
 Users never import from here: everything a user calls comes from their
 viewer's own package (`from ocp_vscode import *`), and all four packages

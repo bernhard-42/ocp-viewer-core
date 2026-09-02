@@ -31,8 +31,6 @@ configuration is `keys.CONFIG` and is not the host's to choose.
 import warnings
 from enum import Enum
 
-from ocp_tessellate.utils import Color
-
 from . import keys
 from .comms import Session, is_pytest
 
@@ -597,6 +595,14 @@ class Config:
         config = self.normalize_values(config)
 
         if config.get("default_edgecolor") is not None:
+            # Lazy on purpose: importing ocp_tessellate runs its package
+            # __init__, which loads the OCP kernel - and this module must be
+            # importable kernel-free (the package __init__ imports it, and
+            # build123d Studio's sidecar imports the package). This is the
+            # module's only ocp_tessellate use, so the kernel is paid here,
+            # at the call, not at import.
+            from ocp_tessellate.utils import Color
+
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
 
         # The transport hears the host keywords for the length of this call, as

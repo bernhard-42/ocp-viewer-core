@@ -32,7 +32,6 @@ import json
 import tempfile
 import time
 
-from ocp_tessellate.utils import numpy_to_json
 from PIL import Image
 
 __all__ = ["Animation"]
@@ -131,6 +130,13 @@ class Animation:
         """Animate the tracks"""
         if self.max_duration == 0:
             raise RuntimeError("Use add_track to add animation tracks")
+
+        # Lazy on purpose: importing ocp_tessellate runs its package __init__,
+        # which loads the OCP kernel - and this module must be importable
+        # kernel-free (the package __init__ imports it). This is the module's
+        # only ocp_tessellate use; by the time anything animates, a show has
+        # long since paid for the kernel anyway.
+        from ocp_tessellate.utils import numpy_to_json
 
         data = {"data": self.tracks, "type": "animation", "config": {"speed": speed}}
         self._viewer.config.session.send_data(json.loads(numpy_to_json(data)))

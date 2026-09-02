@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.5 (2026-09-02)
+
+- Importing the package is kernel-free again: 1.0.4's package root imported `config` and `animation`, whose top-level `ocp_tessellate.utils` imports ran ocp_tessellate's package `__init__` and with it the OCP kernel — which put OCP into build123d Studio's sidecar, whose design keeps the kernel in the measurement process only. Each module now defers its single ocp_tessellate use (`Color` into `set_viewer_config`, `numpy_to_json` into `animate()`) to the call that needs it. The root keeps the full 1.0.4 surface — all seven submodules, attribute access included — and `import ocp_viewer_core` drops from ~0.6 s with the kernel to ~0.14 s without it.
+
 ## Python v1.0.4 (2026-08-31)
 
 - `commands.py` is renamed to `viewer.py`: `from ocp_viewer_core.viewer import *` (or any named subset) is the portable spelling for multi-viewer scripts - it resolves the host from the environment and offers its complete flat surface, star-identical to `from <host> import *`.
