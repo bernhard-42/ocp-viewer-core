@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## JavaScript v1.0.3 (unreleased)
+
+- `set_viewer_config` values survive a resize: the page's `ui` path applied a runtime config change to the viewer but never updated `_config`, so the next resize — a window resize, a splitter drag, build123d Studio's pane observer on every Run — re-derived the geometry from the value just replaced and snapped it back. Observed as `set_viewer_config(glass=False)` reverting to glass mode; the same held for `tools`, `treeWidth` and `theme`. The applied keys now merge into `_config`, so the viewer and its configuration agree.
+
 ## Python v1.0.5 (2026-09-02)
 
 - Importing the package is kernel-free again: 1.0.4's package root imported `config` and `animation`, whose top-level `ocp_tessellate.utils` imports ran ocp_tessellate's package `__init__` and with it the OCP kernel — which put OCP into build123d Studio's sidecar, whose design keeps the kernel in the measurement process only. Each module now defers its single ocp_tessellate use (`Color` into `set_viewer_config`, `numpy_to_json` into `animate()`) to the call that needs it. The root keeps the full 1.0.4 surface — all seven submodules, attribute access included — and `import ocp_viewer_core` drops from ~0.6 s with the kernel to ~0.14 s without it.

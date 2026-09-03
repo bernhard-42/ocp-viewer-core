@@ -455,7 +455,7 @@ export function createPage({
             }
             // One dispatch for every key, shared with every other host, so
             // that a setter cannot exist in one client and not another.
-            applyConfig(viewer, data.config, {
+            const applied = applyConfig(viewer, data.config, {
                 // Only the host knows the other two dimensions, so a
                 // viewport key is a resize rather than a setter.
                 resize: (key, value) => {
@@ -475,6 +475,15 @@ export function createPage({
                     debugLog(`ui: no setter for '${key}'`);
                 }
             });
+            // The viewer changed; _config follows, for exactly the applied
+            // keys. Without this the two disagree, and resize() - a window
+            // resize, a splitter drag, Studio's pane observer on every Run -
+            // re-derives geometry from the value the ui call just replaced:
+            // set_viewer_config(glass=False) held until the next resize
+            // snapped glass back on. Same family: tools, treeWidth, theme.
+            for (const key of applied) {
+                _config[key] = data.config[key];
+            }
         } else if (data.type === "animation") {
             // Explode goes off first: both transform the same objects,
             // and animating an already-displaced model is wrong.
