@@ -400,7 +400,7 @@ viewer (browser JS)
               └─ same websocket, back to the page
 ```
 
-- **The backend runs inside the Flask server**, not in the user's process. The user's `show()` is a _different_ process talking to this one over a _different_ websocket.
+- **The backend runs inside the standalone's server**, not in the user's process. The user's `show()` is a _different_ process talking to this one over a _different_ websocket.
 - **The answer goes back on the same socket the notification arrived on** — the only host where that is true.
 - **It is the one message this server encodes.** Everything else `_update`'s sibling handlers touch is relayed exactly as it arrived, because a model is large and re-encoding it would cost a copy to learn nothing. A backend answer is a dict, so it is dumped — and _decoded to a string_, because bytes go out as a binary frame and arrive in the browser as a `Blob`, where the page's handler expects text.
 
@@ -456,7 +456,7 @@ viewer (frontend JS)
 |                  | where the notification lands                   | what drives the backend        | how the answer is sent                 | processes |
 | ---------------- | ---------------------------------------------- | ------------------------------ | -------------------------------------- | --------- |
 | ocp_vscode       | the backend process, over a websocket          | `WebSocketComms.listener` loop | a _second_ websocket connection (`R:`) | 3         |
-| ocp_viewer       | the Flask server, over the browser's websocket | `sockets._update`              | the same websocket                     | 3         |
+| ocp_viewer       | the standalone's server, over the browser's websocket | `sockets._update`              | the same websocket                     | 3         |
 | jupyter_cadquery | the Jupyter server, over HTTP                  | `MeasureHandler.post`          | the HTTP reply, then a traitlet        | 3         |
 | build123d Studio | the sidecar, over its websocket                | `main.on_viewer_changes`       | the same websocket                     | 4         |
 
@@ -547,7 +547,7 @@ flowchart LR
   subgraph py["user's Python process"]
     S["show()"] --> V["Viewer (core)"] --> SE["Session (core)"] --> C["WebSocketComms (core)"]
   end
-  subgraph srv["python -m ocp_viewer (Flask + flask_sock)"]
+  subgraph srv["python -m ocp_viewer (websockets, threaded server)"]
     H["sockets.handle"] --> VW["Viewer state"]
     VW --> B["ViewerBackend (core)"]
   end
@@ -582,14 +582,16 @@ The server half is small and each piece has one job:
 
 | file                                        | what                                                                                      |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `server/__init__.py`                        | `create_app` / `serve` — the Flask app, the `Sock` route, the port registration           |
+| `server/__init__.py`                        | `serve` — `websockets`' threaded server, its two handlers bound, the port registration    |
 | `server/viewer.py`                          | `Viewer` — the running viewer's state: its two clients, its config, its status, `_splash` |
 | `server/sockets.py`                         | the one websocket, and the six message kinds on it                                        |
-| `server/views.py`                           | the two HTTP routes: `/viewer` and a redirect to it                                       |
+| `server/pages.py`                           | the HTTP side: `/viewer`, the files under `static/`, and a redirect from `/`              |
 | `server/settings.py`                        | the settings a `C:"config"` is answered from                                              |
 | `server/screenshot.py`, `server/network.py` | saving a PNG data URL; the port-in-use check                                              |
 
-The viewer state is one object held in `app.extensions`, not module globals, so two viewers in one process are two viewers — the same defect the Python client side closed.
+The viewer state is one object, bound into the two handlers `serve` hands the server, not module globals, so two viewers in one process are two viewers — the same defect the Python client side closed.
+
+**The server is `websockets`' threaded one** — the library the core's client already speaks through — with compression off and no size limit. One thread per connection, and the browser's socket is written from whichever thread received the Python message; that is safe because `websockets` holds a lock for the whole of `send`. Its predecessor, Flask with flask-sock, had no such lock: a config sent behind a large model went through the shared deflate context and onto the socket first, and the browser could not read it. HTTP is answered from the `process_request` hook, which is all a page and a few static files need.
 
 **Relaying is done without decoding**: a model is large, the browser wants exactly the bytes Python sent, and parsing it in the middle would cost a copy of the whole thing to learn nothing.
 
@@ -599,7 +601,7 @@ The backend is created with the viewer and loaded with the logo at startup, so t
 
 ### How the JavaScript is integrated
 
-**Copied into the wheel, and served by Flask.** `make assets` resolves `ocp-viewer-core` and `three-cad-viewer` from npm and copies them into the package:
+**Copied into the wheel, and served from `pages.py`.** `make assets` resolves `ocp-viewer-core` and `three-cad-viewer` from npm and copies them into the package:
 
 ```
 node_modules/ocp-viewer-core/src/*.js        → ocp_viewer/server/static/js/ocp-viewer-core/

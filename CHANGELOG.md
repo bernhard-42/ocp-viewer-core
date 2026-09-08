@@ -2,7 +2,7 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
-## JavaScript v1.0.3 (unreleased)
+## JavaScript v1.0.3 (2026-09-03)
 
 - `set_viewer_config` values survive a resize: the page's `ui` path applied a runtime config change to the viewer but never updated `_config`, so the next resize — a window resize, a splitter drag, build123d Studio's pane observer on every Run — re-derived the geometry from the value just replaced and snapped it back. Observed as `set_viewer_config(glass=False)` reverting to glass mode; the same held for `tools`, `treeWidth` and `theme`. The applied keys now merge into `_config`, so the viewer and its configuration agree.
 
