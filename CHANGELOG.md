@@ -2,6 +2,11 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.7 (2026-09-09)
+
+- New `tessellator.py`: `ImageFace` and the three native-tessellator toggles, so a host reaches past the core into ocp_tessellate for neither. That import was the only reason a viewer named `ocp-tessellate` among its own dependencies - the pipeline that tessellates is here, and it carries the dependency for everyone. `ocp_tessellate` defines `enable_native_tessellator`, `disable_native_tessellator` and `is_native_tessellator_enabled` only when `ocp_addons` is installed, which is why each host wrapped the import in `try`/`except` and kept the names out of its `__all__`; they are unconditional here, `is_native_tessellator_enabled()` answers False when the accelerator is absent and `enable_native_tessellator()` says why it cannot. `init_native_tessellator()` applies `NATIVE_TESSELLATOR` from the environment and returns what it achieved rather than printing - stdout belongs to the host, as build123d Studio's sidecar learned. The module loads the tessellator and with it the kernel, so the package root does not import it.
+- `websockets` and `questionary` are declared. `websocket.py` imports websockets at module level and questionary in the which-viewer prompt, and both were declared only by the hosts that happened to reach the module first: a plain `pip install jupyter-cadquery` installed neither and failed at import.
+
 ## Python v1.0.6 (2026-09-09)
 
 - The built-in defaults (`DEFAULT_DEFAULTS`: `timeit`, `debug`, `show_locals`, `render_normals`, ...) are fallbacks under the workspace config, not an overlay on top of it. `Config.defaults` was seeded from that table at construction and `combined_config` applied it last, so a host's stored setting sharing a key with the table could never take effect - ocp-viewer's `--timeit` answered `timeit: True` from its workspace config and every client's `show()` saw `False`; the same for `--debug`. `collapse` had been carved out of the seed for the same reason (`NOT_RESTORED_ON_RESET`, gone now), one key of a general defect. `Config.defaults` now holds only what `set_defaults` was told; `reset_defaults()` empties it.
