@@ -2,7 +2,7 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
-## Python v1.0.6 (unreleased)
+## Python v1.0.6 (2026-09-09)
 
 - The built-in defaults (`DEFAULT_DEFAULTS`: `timeit`, `debug`, `show_locals`, `render_normals`, ...) are fallbacks under the workspace config, not an overlay on top of it. `Config.defaults` was seeded from that table at construction and `combined_config` applied it last, so a host's stored setting sharing a key with the table could never take effect - ocp-viewer's `--timeit` answered `timeit: True` from its workspace config and every client's `show()` saw `False`; the same for `--debug`. `collapse` had been carved out of the seed for the same reason (`NOT_RESTORED_ON_RESET`, gone now), one key of a general defect. `Config.defaults` now holds only what `set_defaults` was told; `reset_defaults()` empties it.
 
