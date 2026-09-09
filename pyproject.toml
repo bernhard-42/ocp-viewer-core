@@ -35,7 +35,19 @@ classifiers = [
 # re-resolved when the host adopts the core.
 # pillow is the animation module's: `save_as_gif` assembles the frames. Shared
 # functionality carries its dependency in the core rather than per host.
-dependencies = ["ocp-tessellate>=3.5.0,<3.6.0", "orjson", "pillow", "threejs-materials>=1.2.0,<1.3.0"]
+# websockets and questionary are `websocket.py`'s, for the same reason: the
+# client every host speaks through imports websockets at module level, and
+# questionary asks which viewer to use when several are open. They used to be
+# declared only by the hosts that reached the module first, which left a plain
+# `pip install jupyter-cadquery` importing a package nothing had installed.
+dependencies = [
+    "ocp-tessellate>=3.5.0,<3.6.0",
+    "orjson",
+    "pillow",
+    "questionary>=2.1,<3.0",
+    "threejs-materials>=1.2.0,<1.3.0",
+    "websockets>=16.0",
+]
 
 [project.optional-dependencies]
 dev = ["build", "bump-my-version", "black", "pytest", "twine"]
