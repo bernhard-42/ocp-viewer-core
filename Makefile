@@ -1,4 +1,4 @@
-.PHONY: clean bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release
+.PHONY: clean bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release create-release
 
 PYCACHE := $(shell find . -name '__pycache__')
 EGGS := $(wildcard *.egg-info)
@@ -12,9 +12,11 @@ clean:
 # Version commands
 #
 # major.minor is the contract between the two halves and moves together
-# (`make bump part=minor`); the patch level is each half's own, so a fix on
-# one side ships without an artificial release of the other
-# (`make bump-py part=patch`, `make bump-js part=patch`). See Development.md.
+# (`make bump-py part=minor` and `make bump-js part=minor`, each on its own -
+# there is no combined target, one once bumped JavaScript for a Python-only
+# fix); the patch level is each half's own, so a fix on one side ships without
+# an artificial release of the other (`make bump-py part=patch`,
+# `make bump-js part=patch`). See Development.md.
 
 bump-py:
 	@echo Current Python version: $(PY_VERSION)
@@ -63,9 +65,9 @@ check:
 # proven - a tarball reference rewrites package.json and the lockfile, so it is
 # a development state and never a committed one.
 #
-# One version covers both halves; `make bump` keeps pyproject.toml,
-# _version.py and js/package.json in step, so the wheel and the tarball built
-# from one tree always agree.
+# Each half carries its own version - `.bumpversion-py.toml` for pyproject.toml
+# and _version.py, `.bumpversion-js.toml` for js/package.json and version.js -
+# and the two agree on major.minor by the contract.
 
 dist: wheel tarball
 
@@ -95,3 +97,22 @@ release:
 	git status
 	git diff-index --quiet HEAD || git commit -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
 	git tag -a v$(PY_VERSION) -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
+
+# Push, then a GitHub release under the Python tag `release` made, carrying
+# both halves: the wheel and sdist PyPI got, and the npm tarball. All three
+# must exist in dist/ - `make dist` builds them - or nothing is pushed.
+create-release:
+	@for f in dist/ocp_viewer_core-$(PY_VERSION)-py3-none-any.whl \
+	         dist/ocp_viewer_core-$(PY_VERSION).tar.gz \
+	         dist/ocp-viewer-core-v$(JS_VERSION).tgz; do \
+	    test -f $$f || { echo "missing $$f - run make dist first"; exit 1; }; \
+	done
+	@git push
+	@git push --tags
+	@gh release create v$(PY_VERSION) \
+	    "dist/ocp_viewer_core-$(PY_VERSION)-py3-none-any.whl#Python $(PY_VERSION) - wheel (PyPI)" \
+	    "dist/ocp_viewer_core-$(PY_VERSION).tar.gz#Python $(PY_VERSION) - source (PyPI)" \
+	    "dist/ocp-viewer-core-v$(JS_VERSION).tgz#JavaScript $(JS_VERSION) - npm package" \
+	    --title "ocp-viewer-core: Python $(PY_VERSION), JavaScript $(JS_VERSION)" \
+	    --notes "Python $(PY_VERSION) on PyPI, JavaScript $(JS_VERSION) on npm. See CHANGELOG.md." \
+	    --target main
