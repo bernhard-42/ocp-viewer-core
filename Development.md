@@ -37,17 +37,17 @@ Each half tracks its own version in its own config: `.bumpversion-py.toml` (writ
 ```bash
 make bump-py part=patch   # Python-only fix
 make bump-js part=patch   # JavaScript-only fix
-make bump part=minor      # contract change: both halves move together
-make bump part=major      # likewise
+make bump-py part=minor   # contract change: both halves move together,
+make bump-js part=minor   # each bumped on its own
 ```
 
-`make bump part=minor|major` runs both bumps; because both sides always agree on major.minor, bumping each from its own current lands both on the same `X.Y.0`.
+There is deliberately no target that bumps both halves at once: a patch is one half's own, and a combined target once bumped JavaScript for a Python-only fix. For a minor or major, run both `bump-py` and `bump-js`; because both sides always agree on major.minor, bumping each from its own current lands both on the same `X.Y.0`.
 
 ## Releasing
 
 - **Python-only patch**: `make bump-py part=patch` → `make wheel` → `make upload`. Done — users get it with `pip install -U`, no viewer releases.
 - **JS-only patch**: `make bump-js part=patch` → `make tarball` → `cd js && npm publish`. Viewers pick it up on their next build, deliberately.
-- **Minor/major**: `make bump part=minor` → publish both halves → bump the four viewers' Python floors to the new minor (`>=X.Y.0,<X.(Y+1).0`) and their npm pins as they rebuild.
+- **Minor/major**: `make bump-py part=minor` and `make bump-js part=minor` → publish both halves → bump the four viewers' Python floors to the new minor (`>=X.Y.0,<X.(Y+1).0`) and their npm pins as they rebuild.
 
 Viewer consumption, for reference: Python floors are minor-ranged (`>=1.1.0,<1.2.0`), npm pins are exact — the JS half is bundled per viewer build, so exact pins plus deliberate rebuilds are the right shape there.
 

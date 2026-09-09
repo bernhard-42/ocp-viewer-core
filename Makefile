@@ -1,4 +1,4 @@
-.PHONY: clean bump bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release
+.PHONY: clean bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release
 
 PYCACHE := $(shell find . -name '__pycache__')
 EGGS := $(wildcard *.egg-info)
@@ -37,9 +37,6 @@ else
 	@echo "Provide part=major|minor|patch or version=x.y.z"
 	exit 1
 endif
-
-bump: bump-py bump-js
-	@echo "Python: $$(awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-py.toml), JavaScript: $$(awk '/current_version =/ {print substr($$3, 2, length($$3)-2)}' .bumpversion-js.toml)"
 
 # Development
 #
