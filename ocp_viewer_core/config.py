@@ -204,10 +204,18 @@ COLLAPSE_NAME_MAPPING = {
 }
 
 
-# The defaults that are ours rather than the viewer's - the ones no workspace
-# setting and no viewer state supplies. Module level and copied per instance,
-# so construction and reset_defaults() read one source instead of two literals
-# that drift.
+# The fallbacks: what a key is when neither the host's stored settings nor the
+# viewer's reported state nor `set_defaults` says otherwise. The bottom of the
+# precedence, applied first so that anything a host persists shows through.
+#
+# They were applied *last*, on top of the workspace config, and that masked
+# every stored setting sharing a key with this table: a standalone started with
+# `--timeit` answered `timeit: True` from its workspace config and every client
+# saw False, because `Config.defaults` was seeded from here at construction and
+# `combined_config` wrote it over the workspace. `collapse` had been carved out
+# of the seed for exactly that reason (all three hosts ship a collapse setting
+# and none could take effect); the carve-out treated one key of a general
+# defect. `Config.defaults` now holds only what `set_defaults` was told.
 DEFAULT_DEFAULTS = {
     "render_normals": False,
     "render_mates": False,
@@ -219,15 +227,6 @@ DEFAULT_DEFAULTS = {
     "collapse": Collapse.ROOT,
     "debug": False,
 }
-
-# The defaults `reset_defaults` does *not* put back, and the asymmetry is
-# load-bearing. `combined_config` applies the defaults last, so a key listed
-# among them masks whatever the viewer reports for it. `collapse` is the
-# viewer's own - the user changes it by clicking, and it comes back in
-# `status` - so keeping it after a reset would make `combined_config` answer
-# `Collapse.ROOT` however the tree actually stands, and the next show would
-# re-collapse a tree the user had opened.
-NOT_RESTORED_ON_RESET = ("collapse",)
 
 
 class Config:
@@ -265,28 +264,8 @@ class Config:
         self.all = keys.ALL
         self.settable = keys.SETTABLE
 
-        self.defaults = self._initial_defaults()
-
-    @staticmethod
-    def _initial_defaults():
-        """The defaults a Config starts with, and the ones a reset returns to.
-
-        `NOT_RESTORED_ON_RESET` is honoured here as well as in
-        `reset_defaults`, and the two agreeing is the point. They did not:
-        construction took `DEFAULT_DEFAULTS` whole, so `collapse` sat in the
-        defaults - which `combined_config` applies *last* - and masked both the
-        host's stored setting and the tree the user had just opened, on every
-        show until something called `reset_defaults()`. All three hosts ship a
-        collapse setting and none of them could take effect.
-
-        The comment on `NOT_RESTORED_ON_RESET` always described this exactly;
-        only the reset path acted on it.
-        """
-        return {
-            key: value
-            for key, value in DEFAULT_DEFAULTS.items()
-            if key not in NOT_RESTORED_ON_RESET
-        }
+        # Only what `set_defaults` was told; the fallbacks are applied by the reads.
+        self.defaults = {}
 
     def validate_keyword(self, key):
         """Why this host cannot act on `key`, or None if it can.
@@ -381,8 +360,9 @@ class Config:
             )
 
     def get_defaults(self):
-        """Get all defaults"""
-        result = dict(self.workspace_config())
+        """The effective defaults: fallbacks, under the workspace config, under `set_defaults`."""
+        result = dict(DEFAULT_DEFAULTS)
+        result.update(self.workspace_config())
         result.update(self.defaults)
         return result
 
@@ -485,22 +465,22 @@ class Config:
 
         use_status = not wspace_config.get("_splash", False)
 
+        combined = dict(DEFAULT_DEFAULTS)
+        combined.update(wspace_config)
         if use_status:
-            wspace_config.update(self.config_filter(wspace_status))
+            combined.update(self.config_filter(wspace_status))
+        combined.update(self.defaults)
 
-        wspace_config.update(self.defaults)
-
-        return dict(sorted(wspace_config.items()))
+        return dict(sorted(combined.items()))
 
     def get_changed_config(self, key=None):
         """Get changed config from workspace and status"""
 
-        wspace_config = self.workspace_config()
-        wspace_config.update(self.defaults)
+        config = self.get_defaults()
         if key is None:
-            return wspace_config
+            return config
         else:
-            return wspace_config.get(key)
+            return config.get(key)
 
     # pylint: disable=too-many-arguments,unused-argument,too-many-locals
     def set_viewer_config(
@@ -842,7 +822,7 @@ class Config:
             if config.get("transparent") is not None:
                 self.set_viewer_config(transparent=config["transparent"])
 
-        self.defaults = self._initial_defaults()
+        self.defaults = {}
 
     def check_deprecated(self, kwargs, _length=1):
         """Check for deprecated arguments"""

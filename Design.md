@@ -118,14 +118,13 @@ It used to supply a second, `workspace_config_keys`, and that was a mistake wort
 The precedence, in `combined_config`:
 
 ```
-workspace config          (what the host stores)
+DEFAULT_DEFAULTS          (the fallbacks: what a key is when nobody says otherwise)
+  ← overlaid by the workspace config   (what the host stores)
   ← overlaid by the viewer's reported status, filtered to keys.CONFIG, but only when _splash is False
-  ← overlaid by the defaults set in code   (Config.defaults)
+  ← overlaid by what set_defaults was told   (Config.defaults)
 ```
 
-**The defaults are applied last, and that asymmetry is load-bearing.** A key present in `Config.defaults` masks whatever the viewer reports for it. Which is why `collapse` is in `NOT_RESTORED_ON_RESET`: it is the viewer's own — the user changes it by clicking, and it comes back in `status` — so putting it back on reset would make `combined_config` answer `Collapse.ROOT` however the tree actually stands, and the next show would re-collapse a tree the user had just opened.
-
-`DEFAULT_DEFAULTS` is module level and copied per instance, so construction and `reset_defaults()` read one source rather than two literals that drift.
+**`Config.defaults` holds only what `set_defaults` was told, and the fallbacks sit underneath everything.** It used to be seeded from `DEFAULT_DEFAULTS` at construction and applied last, so every stored setting that shared a key with that table was masked: a standalone started with `--timeit` answered `timeit: True` from its workspace config and every client's `show()` saw `False`. `collapse` had been carved out of the seed for the same reason — all three hosts ship a collapse setting and none could take effect — and the carve-out (`NOT_RESTORED_ON_RESET`) treated one key of a general defect. Now `reset_defaults()` empties the tier, and a key nobody supplies falls back to the table.
 
 The enums live here too — `Camera`, `Collapse`, `Render`, `AnalysisTool`, `UiTab` and the five `Studio*` families. **Their values are already what the receiver expects**: `Collapse`'s numbers are three-cad-viewer's `CollapseState`, `Camera`'s and `UiTab`'s are the strings it takes. So unwrapping the enum is the whole of the translation, and `set_viewer_config` unwraps _every_ argument that is an `Enum` rather than consulting a list of names — the list was six long and `reset_camera` was not on it, so `set_viewer_config(reset_camera=Camera.KEEP)` used to put an enum object on the wire.
 

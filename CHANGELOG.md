@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.6 (unreleased)
+
+- The built-in defaults (`DEFAULT_DEFAULTS`: `timeit`, `debug`, `show_locals`, `render_normals`, ...) are fallbacks under the workspace config, not an overlay on top of it. `Config.defaults` was seeded from that table at construction and `combined_config` applied it last, so a host's stored setting sharing a key with the table could never take effect - ocp-viewer's `--timeit` answered `timeit: True` from its workspace config and every client's `show()` saw `False`; the same for `--debug`. `collapse` had been carved out of the seed for the same reason (`NOT_RESTORED_ON_RESET`, gone now), one key of a general defect. `Config.defaults` now holds only what `set_defaults` was told; `reset_defaults()` empties it.
+
 ## JavaScript v1.0.3 (2026-09-03)
 
 - `set_viewer_config` values survive a resize: the page's `ui` path applied a runtime config change to the viewer but never updated `_config`, so the next resize — a window resize, a splitter drag, build123d Studio's pane observer on every Run — re-derived the geometry from the value just replaced and snapped it back. Observed as `set_viewer_config(glass=False)` reverting to glass mode; the same held for `tools`, `treeWidth` and `theme`. The applied keys now merge into `_config`, so the viewer and its configuration agree.
