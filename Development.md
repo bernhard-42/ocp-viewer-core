@@ -47,6 +47,8 @@ There is deliberately no target that bumps both halves at once: a patch is one h
 
 - **Python-only patch**: `make bump-py part=patch` → `make wheel` → `make upload`. Done — users get it with `pip install -U`, no viewer releases.
 - **JS-only patch**: `make bump-js part=patch` → `make tarball` → `cd js && npm publish`. Viewers pick it up on their next build, deliberately.
+
+What each of those means **in every host** - which pin moves, which artefact has to be rebuilt, and in which order - is `Upgrade.md`.
 - **Minor/major**: `make bump-py part=minor` and `make bump-js part=minor` → publish both halves → bump the four viewers' Python floors to the new minor (`>=X.Y.0,<X.(Y+1).0`) and their npm pins as they rebuild.
 
 Viewer consumption, for reference: Python floors are minor-ranged (`>=1.1.0,<1.2.0`), npm pins are exact — the JS half is bundled per viewer build, so exact pins plus deliberate rebuilds are the right shape there.
