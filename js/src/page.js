@@ -484,6 +484,17 @@ export function createPage({
             for (const key of applied) {
                 _config[key] = data.config[key];
             }
+            // Glass and tools decide whether the tree sits over the canvas or
+            // beside it, and three-cad-viewer re-lays out with the `cadWidth`
+            // it was given: leaving glass mode grows the viewer by `treeWidth`
+            // where the canvas should have shrunk by it, so it overflows the
+            // pane until something else happens to resize it. The host owns
+            // the other two dimensions, so it re-derives all three here, the
+            // way a window resize does - `_config` carries the new value by
+            // now, which is what `normalizeWidth` reads.
+            if (applied.includes("glass") || applied.includes("tools")) {
+                resize();
+            }
         } else if (data.type === "animation") {
             // Explode goes off first: both transform the same objects,
             // and animating an already-displaced model is wrong.
