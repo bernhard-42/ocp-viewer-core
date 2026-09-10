@@ -95,7 +95,7 @@ make create-release         # push, push --tags, gh release
 
 **If the patch adds or removes a core dependency**, the hosts that name the core's transitive dependencies have to follow:
 
-- build123d Studio's `core_cad` group names them deliberately - "so Upgrade reaches them" - and `tests/unit/requirements.test.mjs` fails when the two lists disagree. Both directions matter: a dependency the core gains must be added, one it loses must be dropped.
+- build123d Studio's `core_cad` group names them deliberately - "so Upgrade reaches them" - and `tests/unit/requirements.test.mjs:327` ("every dependency of ocp-viewer-core is declared, so an upgrade reaches it") reads `runtime/uv.lock` and fails when a dependency of the core is declared nowhere in `runtime/pyproject.toml`. **It checks that one direction only**: a name Studio still declares after the core has dropped it passes silently, so removals have to be noticed by hand - which is exactly what happened when `questionary` became an extra.
 - A dependency that becomes an **extra** (as `questionary` did in 1.0.8) is the same event in reverse: the hosts that can reach the code ask for `ocp-viewer-core[cli]`, and the hosts that cannot lose the package.
 
 ---
@@ -181,7 +181,11 @@ Both halves are then published - PyPI and npm - and the CHANGELOG carries an ent
 | jupyter-cadquery | floor `>=1.1.0,<1.2.0`, and a cad-viewer-widget release to match |
 | build123d Studio | `core_cad` floor `>=1.1.0,<1.2.0`, npm pin `1.1.0`, `yarn build`, `uv lock` |
 
-**The handshake will tell you if a host is left behind, and it is meant to.** `Session.send_data` puts `_core_version` into every model's config; `page.js` strips it before `applyConfig` and `console.error`s once per page when major.minor differ; ocp_vscode's `check_upgrade` accepts only a null or patch-level `semver.diff`. A half-upgraded host is therefore loud rather than subtly wrong - **except in jupyter-cadquery**, whose widget path drops `_core_version` in its argument filters and has no frontend check yet. Upgrade that pair with extra care.
+**The handshake will tell you if a host is left behind, and it is meant to.** `Session.send_data` (`comms.py:302`) puts `_core_version` into every model's config, and `page.js`'s `consumeCoreVersion` strips it before `applyConfig` and `console.error`s once per page when major.minor differ. That check runs wherever the shared page runs: ocp_vscode (`controller.ts` loads the core's `index.js`), ocp_viewer (`viewer.html:37`) and build123d Studio (`src/viewer/viewer.js:4`) all call `createPage`.
+
+**cad-viewer-widget does not, and so jupyter-cadquery has no frontend check at all.** The widget imports `applyConfig`, `createRenderer`, `buildDisplayOptions` and the rest by name and builds its own UI from three-cad-viewer's `Viewer`/`Display`; `createPage` is never called, so `consumeCoreVersion` never runs and `_core_version` simply never reaches any code that would look at it. Upgrade that pair with extra care.
+
+A separate mechanism, easy to confuse with this one: ocp_vscode's `check_upgrade` (`extension.ts:56`) compares the **ocp_vscode library version with the extension version** - not the core's - and treats `semver.diff` values of `null`, `"patch"` and `"prepatch"` as compatible, warning otherwise.
 
 **A major** is the same procedure with `part=major`, plus the thing a major exists for: the wire vocabulary changed, so every host's own dispatch has to be re-read rather than assumed to still fit.
 
