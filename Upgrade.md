@@ -9,7 +9,7 @@ No host loads this repository's sources. Each takes its own copy, by a different
 | host | JavaScript, and how it arrives | Python | refresh |
 | --- | --- | --- | --- |
 | **ocp_vscode** (`vscode-ocp-cad-viewer`) | npm dependencies in `node_modules/`, packed into the `.vsix` | `ocp-viewer-core[cli]` floor in `pyproject.toml` | `yarn install`, then `make vsix` / `make dist` |
-| **ocp_viewer** (`ocp-viewer`) | npm dependencies **copied** into `ocp_viewer/server/static/` (tracked files) | `ocp-viewer-core[cli]` floor in `pyproject.toml` | `make assets` after any dependency change |
+| **ocp_viewer** (`ocp-viewer`) | npm dependencies **copied** into `ocp_viewer/server/static/` (gitignored - regenerated, never committed) | `ocp-viewer-core[cli]` floor in `pyproject.toml` | `make assets` after any dependency change |
 | **cad-viewer-widget** | webpack-bundled into `cad_viewer_widget/labextension/` | no core dependency; the widget is pure ipywidgets | `PATH=<env>/bin:$PATH yarn --cwd js build` |
 | **jupyter-cadquery** | none of its own - it renders through cad-viewer-widget | `ocp-viewer-core` floor, plus `cad-viewer-widget>=4.1.0,<4.2` | nothing to build; a widget release is what reaches it |
 | **build123d Studio** | npm dependencies bundled by vite | `runtime/pyproject.toml`, group `core_cad` | `yarn build`, then `uv lock` for the runtime |
@@ -19,7 +19,7 @@ build123d Studio is maintained by its own session. Everything below describes wh
 Two properties worth remembering before any of this:
 
 - **The core's JavaScript declares a peer dependency on three-cad-viewer**: `">=5.0.3 <5.1.0"` in `js/package.json`. A tcv release inside 5.0.x needs no core release. A 5.1 does - the peer range is part of the core's JavaScript half, so moving it is a core JS change.
-- **Safe-chain hides any package version younger than 48 hours.** A pin bumped to a version published an hour ago does not resolve on this machine; the resolver silently takes the newest version at least 48 hours old, and prints `ℹ Safe-chain: Some package versions were suppressed ...`. So publish, then wait, then bump the pins - or accept that the first `yarn install` gets the old one.
+- **Safe-chain hides a package version younger than 48 hours from the resolver - but not this ecosystem's own packages.** `~/.safe-chain/config.json` excludes `ocp-viewer-core` and `three-cad-viewer` on npm, and `ocp-viewer-core`, `ocp-viewer` and `ocp-tessellate` on pip, so a pin or floor can be bumped the minute the release is up. **Not excluded**: `ocp_vscode`, `cad-viewer-widget` and `jupyter-cadquery` on pip - a floor pointing at a just-published version of one of *those* (jupyter-cadquery's `cad-viewer-widget>=...` after a widget release, say) resolves to the previous one for two days, silently, with only an `ℹ Safe-chain: Some package versions were suppressed ...` line to say so. Add it to the exclusions or wait.
 
 ---
 
@@ -44,7 +44,6 @@ make vsix          # or `make install-vsix` to try it in VS Code
 cd ~/Development/CAD/ocp-viewer
 # edit package.json: "three-cad-viewer": "5.0.6"
 make assets        # yarn install --check-files, then copies dist/*.js + css into static/
-git status         # the copied files under ocp_viewer/server/static/ are tracked - they belong in the commit
 make tests
 ```
 
@@ -62,6 +61,8 @@ PATH=$HOME/.uv-global/ocp79-vtk/.venv/bin:$PATH yarn --cwd js build
 **jupyter-cadquery**: nothing. It gets the new renderer when cad-viewer-widget is rebuilt (development) or released (users).
 
 **build123d Studio**: bump `three-cad-viewer` in `package.json`, `yarn build`.
+
+**ocp_viewer's copies are not in git.** `.gitignore` excludes `server/static/js/three-cad-viewer.esm.js`, the css and the whole `server/static/js/ocp-viewer-core/` directory, so `make assets` produces nothing to commit: the only committed record of what the viewer ships is `package.json` and `yarn.lock`. `make dist` depends on `assets` and re-runs it, so the wheel carries whatever `node_modules` held at build time - which is why the pin, not the working copy, is what has to be right before a release.
 
 **Verify** in one host at least, in the browser: three-cad-viewer changes are visual, and nothing in any test suite here looks at pixels.
 
@@ -121,7 +122,7 @@ yarn install && make vsix
 
 # ocp_viewer
 # package.json: "ocp-viewer-core": "1.0.4"
-make assets && git status   # static/js/ocp-viewer-core/*.js are tracked and will differ
+make assets
 
 # cad-viewer-widget
 # js/package.json: "ocp-viewer-core": "1.0.4"
@@ -198,7 +199,7 @@ The one case that is genuinely JavaScript-only at minor level is the **peer rang
 
 1. **three-cad-viewer** first, if it is in play - the core's peer range and every host's pin depend on it.
 2. **ocp-viewer-core** next: bump, changelog, check, tests, dist, upload, release, create-release.
-3. **Wait 48 hours** before bumping pins, or verify what actually resolved (`grep '"version"' <host>/node_modules/ocp-viewer-core/package.json`).
+3. **Bump the pins straight away** - the core and three-cad-viewer are excluded from safe-chain's minimum-age rule. Verify what actually resolved anyway (`grep '"version"' <host>/node_modules/ocp-viewer-core/package.json`), and remember that a floor on a freshly released *host* package is not excluded.
 4. **cad-viewer-widget** before **jupyter-cadquery**: jc's floor is on the widget, so the widget has to exist first.
 5. **ocp_viewer** and **ocp_vscode** in either order.
 6. **build123d Studio** last, by its own session, with a note of what changed.
