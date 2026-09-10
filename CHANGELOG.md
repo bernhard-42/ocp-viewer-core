@@ -2,6 +2,14 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.8 (2026-09-10)
+
+- `questionary` is the `cli` extra instead of a dependency of every host. Its one use is the prompt in `websocket.py`'s `choose_port`, reached only when several viewers are listening *and* the shell is not a Jupyter kernel - a host running in ipykernel takes the `input()` branch and can never get past it, and build123d Studio does not import `websocket` at all, so two of the four hosts were installing a package they cannot execute. The two whose client runs in a plain shell - ocp_viewer and ocp_vscode - ask for `ocp-viewer-core[cli]`; the import is guarded and names the extra, because the alternative is a bare ImportError at the one moment the user is being asked a question.
+
+## JavaScript v1.0.4 (2026-09-10)
+
+- A runtime `glass` or `tools` change re-derives the page's geometry. `applyConfig` turns `glass` into `viewer.glassMode(...)`, and three-cad-viewer re-lays out with the `cadWidth` it was given: leaving glass mode puts the tree beside the canvas without taking its width off the canvas, so the viewer grew by `treeWidth` and overflowed the pane until something else happened to resize it - measured in the widget host as 1056px of viewer inside an 810px panel, the canvas shifted right and clipped. The page now re-derives all three dimensions the way a window resize does, and `tools`, which reserves the tree the same way, takes the same path.
+
 ## Python v1.0.7 (2026-09-09)
 
 - New `tessellator.py`: `ImageFace` and the three native-tessellator toggles, so a host reaches past the core into ocp_tessellate for neither. That import was the only reason a viewer named `ocp-tessellate` among its own dependencies - the pipeline that tessellates is here, and it carries the dependency for everyone. `ocp_tessellate` defines `enable_native_tessellator`, `disable_native_tessellator` and `is_native_tessellator_enabled` only when `ocp_addons` is installed, which is why each host wrapped the import in `try`/`except` and kept the names out of its `__all__`; they are unconditional here, `is_native_tessellator_enabled()` answers False when the accelerator is absent and `enable_native_tessellator()` says why it cannot. `init_native_tessellator()` applies `NATIVE_TESSELLATOR` from the environment and returns what it achieved rather than printing - stdout belongs to the host, as build123d Studio's sidecar learned. The module loads the tessellator and with it the kernel, so the package root does not import it.
