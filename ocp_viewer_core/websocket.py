@@ -175,7 +175,16 @@ class WebSocketComms(Comms[None]):
         if _ipython().__class__.__name__ == "ZMQInteractiveShell":
             return input(f"Select port from {[int(p) for p in ports]} ")
 
-        import questionary
+        try:
+            import questionary
+        except ImportError as exc:
+            # The `cli` extra, not a dependency: see pyproject.toml. Named in
+            # the message because the alternative is a bare ImportError at the
+            # one moment the user is being asked a question.
+            raise ImportError(
+                "Choosing between several viewers needs questionary: "
+                "pip install 'ocp-viewer-core[cli]'"
+            ) from exc
 
         return questionary.select(
             "Multiple viewers found. Select a port:",
