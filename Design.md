@@ -508,7 +508,7 @@ A connection per message rather than one held open, which is the golden master's
 
 `EXCLUDE_KEYS` is `("cad_width", "height", "viewer", "anchor", "pinning")`. The 61 keys of the viewer's state that survive a show are `keys.CONFIG` and are no longer this host's to state.
 
-The small entry points — `status`, `workspace_config`, `combined_config`, `get_defaults`, `reset_defaults` and the rest — keep the `port=` keyword they have always taken and open the scope around the call themselves. They **wrap rather than nest**: the core's own calls between its methods (`combined_config` asking itself for `status`) go straight to the methods and never back through these, so no scope is opened twice.
+The small entry points — `status`, `workspace_config`, `combined_config`, `get_defaults`, `reset_defaults` and the rest — keep the `port=` keyword they have always taken and open the scope around the call themselves. They **wrap rather than nest**: the core's own calls between its methods (`combined_config` asking itself for `status`, `reset_defaults` sending through `_send_viewer_config` rather than `set_viewer_config`) go straight to the methods and never back through these, so no scope is opened twice — `Comms.begin` overwrites, so a nested scope is a lost one.
 
 **The `is_jupyter_cadquery` import branch is gone.** It decided at import time, from an environment variable, which transport the config functions would use — so `from ocp_vscode import config` behaved differently depending on a variable set somewhere else. A host supplying its own `Comms` is that decision made in one place, by the host, at construction.
 

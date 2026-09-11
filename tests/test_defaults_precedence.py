@@ -85,3 +85,28 @@ def test_collapse_is_no_longer_a_special_case(config):
     assert config.combined_config()["collapse"] == Collapse.LEAVES
     del config.session.comms.stored["collapse"]
     assert config.combined_config()["collapse"] == Collapse.ROOT
+
+
+class ScopedComms(StoredComms):
+    """Records the scope each config was sent under, as the transport sees it."""
+
+    def send_config(self, config, timeit=False):
+        self.sent.append((dict(self.keywords), config))
+
+
+def test_reset_defaults_keeps_the_scope_it_was_called_in():
+    # A host wrapper opens the scope - `reset_defaults(port=3939)` - and every
+    # send the reset makes must happen inside it. It called `set_viewer_config`,
+    # which opened a fresh scope with no port and cleared it in its finally, so
+    # both sends went to whichever viewer discovery found.
+    comms = ScopedComms()
+    comms.stored["transparent"] = True
+    session = Session(comms)
+    config = Config(session, exclude_keys=())
+    session.begin({"port": 3939})
+    try:
+        config.reset_defaults()
+    finally:
+        session.clear()
+    assert len(comms.sent) == 2
+    assert [scope for scope, _ in comms.sent] == [{"port": 3939}, {"port": 3939}]

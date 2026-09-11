@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python, unreleased
+
+- `reset_defaults(port=...)` and `reset_defaults(viewer=...)` reset the viewer they name. `Config.reset_defaults` sent through `set_viewer_config`, which opens a scope of its own from its `port`/`viewer` keywords - empty here - over the one the host wrapper had opened, and cleared it in its `finally`, so a named reset went to whichever viewer discovery found (with two viewers listening, the which-port prompt appeared in the middle of `reset_defaults`) and a named sidecar's reset landed on the default one. The validate-translate-send part is `_send_viewer_config` now, and sends from inside whatever scope is open; `set_viewer_config` opens its own around it. Scopes wrap, they never nest - `Comms.begin` overwrites.
+
 ## Python v1.0.8 (2026-09-10)
 
 - `questionary` is the `cli` extra instead of a dependency of every host. Its one use is the prompt in `websocket.py`'s `choose_port`, reached only when several viewers are listening *and* the shell is not a Jupyter kernel - a host running in ipykernel takes the `input()` branch and can never get past it, and build123d Studio does not import `websocket` at all, so two of the four hosts were installing a package they cannot execute. The two whose client runs in a plain shell - ocp_viewer and ocp_vscode - ask for `ocp-viewer-core[cli]`; the import is guarded and names the extra, because the alternative is a bare ImportError at the one moment the user is being asked a question.

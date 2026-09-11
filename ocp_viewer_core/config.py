@@ -554,7 +554,30 @@ class Config:
         viewer=None,
     ):
         """Set viewer config"""
-        self.validate_tool_args(explode, analysis_tool)
+        # `self` is excluded because locals() has it too.
+        kwargs = {key: value for key, value in locals().items() if key != "self"}
+
+        # The transport hears the host keywords for the length of this call, as
+        # it does for a show: a host with more than one viewer needs to know
+        # which of them is being configured.
+        self.session.begin({"port": port, "viewer": viewer})
+        try:
+            self._send_viewer_config(kwargs)
+        finally:
+            self.session.clear()
+
+    def _send_viewer_config(self, kwargs):
+        """Validate, translate and send a config inside whatever scope is open.
+
+        The scope is the caller's: `set_viewer_config` opens one from its own
+        `port`/`viewer` keywords, and `reset_defaults` sends from inside the
+        scope its host wrapper opened. It used to call `set_viewer_config`,
+        which began a fresh, empty scope over the wrapper's and cleared it in
+        its finally - so `reset_defaults(port=3940)` reset whichever viewer
+        discovery found, and `reset_defaults(viewer="named")` reset the default
+        sidecar. `Comms.begin` overwrites; scopes wrap, they never nest.
+        """
+        self.validate_tool_args(kwargs.get("explode"), kwargs.get("analysis_tool"))
 
         # Every argument that was given, with enums unwrapped to their values.
         # The values are what the viewer already expects - Collapse's are
@@ -564,11 +587,11 @@ class Config:
         # Done for every argument rather than for a list of names. The list was
         # six long and reset_camera, which takes a Camera, was not on it, so
         # set_viewer_config(reset_camera=Camera.KEEP) put an enum object on the
-        # wire. `self` is excluded because locals() has it too.
+        # wire.
         config = {
             key: value.value if isinstance(value, Enum) else value
-            for key, value in locals().items()
-            if value is not None and key != "self"
+            for key, value in kwargs.items()
+            if value is not None
         }
 
         self.validate_values(config)
@@ -585,14 +608,7 @@ class Config:
 
             config["default_edgecolor"] = Color(config["default_edgecolor"]).web_color
 
-        # The transport hears the host keywords for the length of this call, as
-        # it does for a show: a host with more than one viewer needs to know
-        # which of them is being configured.
-        self.session.begin({"port": port, "viewer": viewer})
-        try:
-            self.session.set_viewer(config)
-        finally:
-            self.session.clear()
+        self.session.set_viewer(config)
 
     def set_defaults(
         self,
@@ -817,10 +833,10 @@ class Config:
             }
             config["reset_camera"] = Camera.KEEP
 
-            self.set_viewer_config(**config)
+            self._send_viewer_config(config)
 
             if config.get("transparent") is not None:
-                self.set_viewer_config(transparent=config["transparent"])
+                self._send_viewer_config({"transparent": config["transparent"]})
 
         self.defaults = {}
 
