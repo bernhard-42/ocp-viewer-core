@@ -110,3 +110,20 @@ def test_reset_defaults_keeps_the_scope_it_was_called_in():
         session.clear()
     assert len(comms.sent) == 2
     assert [scope for scope, _ in comms.sent] == [{"port": 3939}, {"port": 3939}]
+
+
+def test_a_status_echo_of_a_construction_choice_does_not_survive_into_the_next_show():
+    # `orbit_control` and `up` are chosen when a camera is built and never
+    # reported by the viewer, so a page host's status never holds them and a
+    # show() sets them for that call alone. The widget host's status echoes
+    # its own traits - Python's last-sent value - and the filter kept the
+    # echo, so `show(orbit_control=True)` stuck to every following show.
+    comms = StoredComms()
+    comms.stored["orbit_control"] = False
+    comms.stored["up"] = "Z"
+    comms.reported = {"orbit_control": True, "up": "Y", "axes": True}
+    config = Config(Session(comms), exclude_keys=())
+    combined = config.combined_config()
+    assert combined["orbit_control"] is False
+    assert combined["up"] == "Z"
+    assert combined["axes"] is True

@@ -235,7 +235,21 @@ ALL = merge(
 #   cad_width, height - the surface's geometry, decided by whoever owns the
 #              surface. See each host's exclude_keys, which runs both ways.
 #   edge_accuracy - a tessellation input, consumed before a viewer sees it.
-NOT_CONFIG = (*CONTROL, *CAMERA, "cad_width", "height", "edge_accuracy")
+#   orbit_control, up - chosen when a camera is built and never reported by
+#              the viewer (neither is in three-cad-viewer's notification map),
+#              so a page host's status never holds them and a show sets them
+#              for that call alone. The widget host's status echoes its own
+#              traits - Python's last-sent value - and keeping the echo made
+#              `show(orbit_control=True)` stick to every following show there.
+NOT_CONFIG = (
+    *CONTROL,
+    *CAMERA,
+    "cad_width",
+    "height",
+    "edge_accuracy",
+    "orbit_control",
+    "up",
+)
 
 CONFIG = {key: value for key, value in ALL.items() if key not in NOT_CONFIG}
 
