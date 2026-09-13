@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.10 (2026-09-13)
+
+- `Animation.add_track` refuses what the viewer would drop silently: an action that is not one of `t`, `q`, `tx`, `ty`, `tz`, `rx`, `ry`, `rz`, non-numeric times, and values that are not numbers (scalar actions) or 3- resp. 4-vectors (`t`, `q`) - numpy rows and numpy numbers count. Only the path and the lengths were checked before; the action and value checks lived in cad-viewer-widget alone, on the far side of its transport and against the tree the browser reports after rendering - which under "Run All Cells" has not arrived when the animation cell runs, so every path was refused there while the same notebook run cell by cell passed. The checks are here now, once, for every host; cad-viewer-widget 4.1.2 checks nothing.
+
 ## Python v1.0.9 (2026-09-11)
 
 - `show(orbit_control=True)` and `show(up="Y")` set the control and the up vector for that call alone, in every host. Neither is reported by three-cad-viewer, so a page host's status never carried them and the next show fell back to the workspace setting; Jupyter CadQuery's status echoes its own traits, `config_filter` kept the echo, and there both stuck to every following show. Both are `NOT_CONFIG` now - construction-time choices, not viewer state that survives a show.

@@ -31,6 +31,7 @@ constructor everywhere while the instance knows which viewer it animates.
 import json
 import tempfile
 import time
+from numbers import Real
 
 from PIL import Image
 
@@ -53,6 +54,20 @@ def _frame_times(n_frames, endpoint):
     else:
         step = 1000.0 / n_frames
     return [i * step for i in range(n_frames)]
+
+
+# The three.js keyframe track kinds a track can be: scalar translations and
+# rotations about one axis, a translation vector, a quaternion.
+SCALAR_ACTIONS = ("tx", "ty", "tz", "rx", "ry", "rz")
+ACTIONS = ("t", "q", *SCALAR_ACTIONS)
+
+
+def _is_vector(value, size):
+    """A sequence of `size` numbers - a list, a tuple or a numpy row alike."""
+    try:
+        return len(value) == size and all(isinstance(x, Real) for x in value)
+    except TypeError:
+        return False
 
 
 class Animation:
@@ -112,11 +127,37 @@ class Animation:
         - [three.js QuaternionKeyframeTrack](https://threejs.org/docs/index.html?q=track#api/en/animation/tracks/QuaternionKeyframeTrack)
 
         """
+        # Everything a track can get wrong is refused here, before it is sent:
+        # the viewer's JavaScript drops what it cannot use without a word, and
+        # this is the one place every host passes through. cad-viewer-widget
+        # used to repeat these checks on its side of the transport - against
+        # the tree the *browser* had reported, which under "Run All Cells" had
+        # not arrived yet - so the checks live here and the transports trust
+        # them.
+        if action not in ACTIONS:
+            raise ValueError(f"Action '{action}' is not one of {ACTIONS}")
+
         if len(times) != len(values):
             raise ValueError("Parameters 'times' and 'values' need to have same length")
 
         if path not in self.paths:
             raise ValueError(f"Path '{path}' does not exist in assembly")
+
+        if not all(isinstance(t, Real) for t in times):
+            raise ValueError("Parameter 'times' needs to be a sequence of numbers")
+
+        if action in SCALAR_ACTIONS:
+            if not all(isinstance(v, Real) for v in values):
+                raise ValueError(
+                    f"Parameter 'values' needs to be a sequence of numbers for action '{action}'"
+                )
+        else:
+            size = 3 if action == "t" else 4
+            if not all(_is_vector(v, size) for v in values):
+                raise ValueError(
+                    f"Parameter 'values' needs to be a sequence of {size}-dim vectors "
+                    f"of numbers for action '{action}'"
+                )
 
         self.tracks.append((path, action, times, values))
 
