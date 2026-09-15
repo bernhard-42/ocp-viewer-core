@@ -45,8 +45,10 @@ There is deliberately no target that bumps both halves at once: a patch is one h
 
 ## Releasing
 
-- **Python-only patch**: `make bump-py part=patch` → `make wheel` → `make upload`. Done — users get it with `pip install -U`, no viewer releases.
-- **JS-only patch**: `make bump-js part=patch` → `make tarball` → `cd js && npm publish`. Viewers pick it up on their next build, deliberately.
+- **Python-only patch**: `make bump-py part=patch` → `make dist` → `make release` → `make create-release` → `make upload`. Done — users get it with `pip install -U`, no viewer releases.
+- **JS-only patch**: `make bump-js part=patch` → `make dist` → `make release` → `make create-release` → `cd js && npm publish`. Viewers pick it up on their next build, deliberately.
+
+Every publish of either half gets a GitHub release. Its tag is `v<py>-<js>` (e.g. `v1.0.13-1.0.4`), so the tag sequence shows which half moved, and the release carries both halves' artefacts - the wheel and sdist PyPI got, and the npm tarball. The tag is a git label, not a version: PyPI and npm carry the real numbers, and the `-<js>` part is not a semver pre-release of anything. Tags before 1.0.13 are `v<py>` only.
 
 What each of those means **in every host** - which pin moves, which artefact has to be rebuilt, and in which order - is `Upgrade.md`.
 - **Minor/major**: `make bump-py part=minor` and `make bump-js part=minor` → publish both halves → bump the four viewers' Python floors to the new minor (`>=X.Y.0,<X.(Y+1).0`) and their npm pins as they rebuild.

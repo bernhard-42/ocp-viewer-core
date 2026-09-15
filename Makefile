@@ -92,15 +92,20 @@ upload_test:
 upload:
 	@twine upload dist/*.whl dist/*.tar.gz
 
+# The tag names both halves, v<py>-<js>, so that a release of either half
+# gets a page of its own and the tag sequence shows which half moved. It is
+# a git label, not a version: PyPI and npm carry the real numbers.
+TAG := v$(PY_VERSION)-$(JS_VERSION)
+
 release:
 	git add .
 	git status
 	git diff-index --quiet HEAD || git commit -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
-	git tag -a v$(PY_VERSION) -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
+	git tag -a $(TAG) -m "Latest release: py $(PY_VERSION), js $(JS_VERSION)"
 
-# Push, then a GitHub release under the Python tag `release` made, carrying
-# both halves: the wheel and sdist PyPI got, and the npm tarball. All three
-# must exist in dist/ - `make dist` builds them - or nothing is pushed.
+# Push, then a GitHub release under the tag `release` made, carrying both
+# halves: the wheel and sdist PyPI got, and the npm tarball. All three must
+# exist in dist/ - `make dist` builds them - or nothing is pushed.
 create-release:
 	@for f in dist/ocp_viewer_core-$(PY_VERSION)-py3-none-any.whl \
 	         dist/ocp_viewer_core-$(PY_VERSION).tar.gz \
@@ -109,7 +114,7 @@ create-release:
 	done
 	@git push
 	@git push --tags
-	@gh release create v$(PY_VERSION) \
+	@gh release create $(TAG) \
 	    "dist/ocp_viewer_core-$(PY_VERSION)-py3-none-any.whl#Python $(PY_VERSION) - wheel (PyPI)" \
 	    "dist/ocp_viewer_core-$(PY_VERSION).tar.gz#Python $(PY_VERSION) - source (PyPI)" \
 	    "dist/ocp-viewer-core-v$(JS_VERSION).tgz#JavaScript $(JS_VERSION) - npm package" \
