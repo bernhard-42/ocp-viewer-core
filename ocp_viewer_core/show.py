@@ -1656,7 +1656,10 @@ class Viewer(Generic[H]):
             else:
                 alpha = 1.0
 
-        if update:
+        # An update of a name not yet pushed adds it rather than raising: the
+        # caller asked for "this name holds this object", and that is the
+        # answer whether or not the name existed (vscode-ocp-cad-viewer #238).
+        if update and name in self.objects["names"]:
             index = self.objects["names"].index(name)
             self.objects["objs"][index] = obj
             self.objects["colors"][index] = color

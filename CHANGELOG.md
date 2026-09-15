@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.13 (2026-09-15)
+
+- `push_object(obj, name, update=True)` for a name that was never pushed adds it instead of raising `ValueError` from `list.index`. Ported from vscode-ocp-cad-viewer PR #238 (Arbel Arad), which landed on that repository's `main` in the old `ocp_vscode/show.py` after the function had moved here, so the adoption dropped it. `tests/test_push_object.py` covers the registry.
+
 ## Python v1.0.12 (2026-09-15)
 
 - `Animation` constructed with something that is not a viewer says so. A script that translates `from ocp_vscode.animation import Animation` into `from ocp_viewer_core.animation import Animation` gets the raw class, whose first parameter is the viewer a host's binding supplies; `Animation(assembly)` then failed inside the assembly with `get_last_paths is not an attribute of MAssembly(...)` (or `'AnimationGroup' object has no attribute 'get_last_paths'`), naming neither the cause nor the cure. The constructor now raises a `TypeError` that names the bound import - the viewer package's own `Animation`, or `from ocp_viewer_core.viewer import Animation` - and what it got instead. The host bindings are unchanged.
