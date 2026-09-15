@@ -73,7 +73,23 @@ def _is_vector(value, size):
 class Animation:
     """Class to create animations for the viewer"""
 
-    def __init__(self, viewer, assembly=None):
+    def __init__(self, viewer=None, assembly=None):
+        # The first argument is the Viewer, which a host's `Animation` binds. A
+        # script that imports this class directly - the natural but wrong
+        # translation of `from <viewer package>.animation import Animation` -
+        # lands its assembly here, or nothing at all (`viewer` defaults to None
+        # only so that `Animation()` reaches this message too), and the error
+        # would otherwise surface as "get_last_paths is not an attribute of
+        # MAssembly(...)" or as a missing positional argument.
+        if not hasattr(viewer, "get_last_paths"):
+            got = "no argument" if viewer is None else type(viewer).__name__
+            raise TypeError(
+                "Animation is bound by the viewer package: import it from there "
+                "(`from <viewer package> import Animation`, e.g. ocp_vscode, "
+                "ocp_viewer, jupyter_cadquery, build123d_studio) or via "
+                "`from ocp_viewer_core.viewer import Animation`, never from "
+                f"`ocp_viewer_core.animation`. Got {got} instead of a viewer."
+            )
         if assembly is not None:
             print("Deprecation: The parameter `assembly` is not needed any more\n")
 

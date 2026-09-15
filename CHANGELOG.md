@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.12 (2026-09-15)
+
+- `Animation` constructed with something that is not a viewer says so. A script that translates `from ocp_vscode.animation import Animation` into `from ocp_viewer_core.animation import Animation` gets the raw class, whose first parameter is the viewer a host's binding supplies; `Animation(assembly)` then failed inside the assembly with `get_last_paths is not an attribute of MAssembly(...)` (or `'AnimationGroup' object has no attribute 'get_last_paths'`), naming neither the cause nor the cure. The constructor now raises a `TypeError` that names the bound import - the viewer package's own `Animation`, or `from ocp_viewer_core.viewer import Animation` - and what it got instead. The host bindings are unchanged.
+
 ## Python v1.0.11 (2026-09-15)
 
 - Imports under cadquery-ocp 8. `materials.py` imported `gp_Vec3f` at module level, and OCP 8.0.1 binds neither it nor `XCAFDoc_VisMaterialPBR.EmissiveFactor` - so every host that imports the core failed to import there, and Jupyter CadQuery's server extension with it. The import is guarded now and the emissive term of a material is skipped under OCP 8, in both directions; colour, metalness, roughness, IOR, opacity, alpha mode and double-sided cross as before. OCP 7.9 is unchanged.

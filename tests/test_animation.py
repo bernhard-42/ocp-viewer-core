@@ -37,6 +37,20 @@ def test_a_vector_track_from_lists_tuples_and_numpy_rows(animation):
     assert len(animation.tracks) == 2
 
 
+def test_the_raw_class_names_the_bound_import():
+    """`from ocp_viewer_core.animation import Animation` then `Animation(assembly)`
+    is the wrong translation of a host's import; say so instead of failing on
+    `get_last_paths` inside the assembly."""
+
+    class Assembly:
+        pass
+
+    with pytest.raises(TypeError, match="Got Assembly instead of a viewer"):
+        Animation(Assembly())
+    with pytest.raises(TypeError, match="Got no argument instead of a viewer"):
+        Animation()
+
+
 def test_an_unknown_path_is_refused(animation):
     with pytest.raises(ValueError, match="does not exist"):
         animation.add_track("/base/leg", "rz", [0, 1], [0, 90])
