@@ -2,6 +2,10 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## Python v1.0.11 (2026-09-15)
+
+- Imports under cadquery-ocp 8. `materials.py` imported `gp_Vec3f` at module level, and OCP 8.0.1 binds neither it nor `XCAFDoc_VisMaterialPBR.EmissiveFactor` - so every host that imports the core failed to import there, and Jupyter CadQuery's server extension with it. The import is guarded now and the emissive term of a material is skipped under OCP 8, in both directions; colour, metalness, roughness, IOR, opacity, alpha mode and double-sided cross as before. OCP 7.9 is unchanged.
+
 ## Python v1.0.10 (2026-09-13)
 
 - `Animation.add_track` refuses what the viewer would drop silently: an action that is not one of `t`, `q`, `tx`, `ty`, `tz`, `rx`, `ry`, `rz`, non-numeric times, and values that are not numbers (scalar actions) or 3- resp. 4-vectors (`t`, `q`) - numpy rows and numpy numbers count. Only the path and the lengths were checked before; the action and value checks lived in cad-viewer-widget alone, on the far side of its transport and against the tree the browser reports after rendering - which under "Run All Cells" has not arrived when the animation cell runs, so every path was refused there while the same notebook run cell by cell passed. The checks are here now, once, for every host; cad-viewer-widget 4.1.2 checks nothing.

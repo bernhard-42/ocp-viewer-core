@@ -15,7 +15,8 @@ so those `PbrProperties` fields do not survive the trip into OCCT.
 Color spaces: `PbrValues.color` is sRGB ratios, `PbrValues.emissive` is linear -
 per that class's docstring. `Quantity_Color` stores linear RGB, converting at
 the boundary via `Quantity_TOC_sRGB`; `EmissiveFactor` is a linear `gp_Vec3f`,
-so it crosses without conversion.
+so it crosses without conversion - where the binding has it: cadquery-ocp 8
+exposes neither, and the emissive term is skipped there.
 """
 
 #
@@ -34,7 +35,13 @@ so it crosses without conversion.
 # limitations under the License.
 #
 
-from OCP.gp import gp_Vec3f
+try:
+    from OCP.gp import gp_Vec3f
+except ImportError:
+    # cadquery-ocp 8 binds neither `gp_Vec3f` nor the PBR material's
+    # `EmissiveFactor`, so under it the emissive term cannot cross in either
+    # direction. Everything else does.
+    gp_Vec3f = None
 from OCP.Graphic3d import Graphic3d_AlphaMode
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA, Quantity_TypeOfColor
 from OCP.TCollection import TCollection_HAsciiString
@@ -85,9 +92,10 @@ def vis_material_to_pbr(vis_material, name=None):
         ior=pbr.RefractionIndex,
     )
 
-    emissive = pbr.EmissiveFactor
-    if not (emissive.r() == 0.0 and emissive.g() == 0.0 and emissive.b() == 0.0):
-        values.emissive = [emissive.r(), emissive.g(), emissive.b()]
+    if gp_Vec3f is not None:
+        emissive = pbr.EmissiveFactor
+        if not (emissive.r() == 0.0 and emissive.g() == 0.0 and emissive.b() == 0.0):
+            values.emissive = [emissive.r(), emissive.g(), emissive.b()]
 
     if vis_material.AlphaMode() == Graphic3d_AlphaMode.Graphic3d_AlphaMode_Mask:
         values.alpha_test = vis_material.AlphaCutOff()
@@ -150,7 +158,7 @@ def pbr_to_vis_material(pbr_properties):
     if values.ior is not None:
         pbr.RefractionIndex = values.ior
 
-    if values.emissive is not None:
+    if values.emissive is not None and gp_Vec3f is not None:
         intensity = values.emissive_intensity
         if intensity is None:
             intensity = 1.0

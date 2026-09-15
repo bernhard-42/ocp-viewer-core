@@ -17,5 +17,5 @@
 # limitations under the License.
 #
 
-__version__ = "1.0.10"  # DO NOT EDIT THIS DIRECTLY!  It is managed by bumpversion
+__version__ = "1.0.11"  # DO NOT EDIT THIS DIRECTLY!  It is managed by bumpversion
 __version_info__ = tuple(int(p) for p in __version__.split("."))
