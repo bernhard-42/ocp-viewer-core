@@ -246,7 +246,7 @@ class WebSocketComms(Comms[None]):
         at the network for a bug in the payload.
         """
         if port is None:
-            port = self.port
+            port = self.port or DEFAULT_PORT
 
         with Timer(timeit, "", "json dumps", 1):
             try:
