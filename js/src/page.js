@@ -363,6 +363,27 @@ export function createPage({
         }
     }
 
+    /**
+     * The logo, with the host's settings in place of the logo's own.
+     *
+     * The logo's config is a whole show's config, and a config value beats a
+     * host override in `preset`. So the logo's `control: "trackball"`, `glass`
+     * and `tools` used to win over what the host was started with, and the
+     * splash ignored `--control orbit` until the first real show. A key the
+     * host overrides is taken out of the logo's config, so the override
+     * applies; `config`, what the host sent with the request, still wins.
+     */
+    function splash(config) {
+        const { data, config: logoConfig, ...rest } = logo();
+        const hostKeys = [overrides.viewer, overrides.display]
+            .filter((o) => o != null)
+            .flatMap((o) => Object.keys(o).filter((k) => o[k] !== undefined));
+        const base = Object.fromEntries(
+            Object.entries(logoConfig).filter(([k]) => !hostKeys.includes(k))
+        );
+        return { ...rest, data, config: { ...base, ...(config || {}) } };
+    }
+
     function handleMessage(message) {
         var data = message;
 
@@ -375,11 +396,7 @@ export function createPage({
             // The splash lives in the core, so a host asks for it by name and
             // sends only what it alone knows: its theme, its tree width and
             // its modifier keys.
-            const splash = logo();
-            data = {
-                ...splash,
-                config: { ...splash.config, ...(data.config || {}) }
-            };
+            data = splash(data.config);
         }
 
         if (data.type === "data" && data?.data?.shapes?.parts?.length > 0) {
@@ -536,8 +553,8 @@ export function createPage({
     return {
         /** Draw the splash, with whatever the host knows that the core cannot. */
         showSplash(config) {
-            const splash = logo();
-            showViewer(splash.data, { ...splash.config, ...config });
+            const { data, config: splashConfig } = splash(config);
+            showViewer(data, splashConfig);
         },
 
         /** The host's theme changed under it - a VS Code colour theme, say. */
