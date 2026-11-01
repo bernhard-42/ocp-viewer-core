@@ -2,6 +2,15 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## JavaScript (unreleased)
+
+- Requires three-cad-viewer 5.2: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`)
+- `cursorPivot`, three-cad-viewer 5.2's option to rotate around and zoom towards the point under the cursor, is a viewer option a host can pass in its overrides, and is settable and readable on a live viewer
+
+## Python (unreleased)
+
+- `cursor_pivot`: a new keyword of `show`, `show_object`, `show_objects`, `set_defaults` and `set_viewer_config`, sent to the viewer as `cursorPivot`. `True` (three-cad-viewer's default) rotates around and zooms towards the point under the cursor, `False` rotates and zooms around the target as before
+
 ## Python v1.1.2 (2026-10-13)
 
 - Requires `ocp-tessellate>=3.6.2,<3.7.0` (was `>=3.6.0`). 3.6.2 fixes `show(assembly, render_mates=True)` for CadQuery assemblies where nanocct is installed (`TypeError: locations of two bindings`): the mates' coordinate systems were built in nanocct under the assembly's OCP location. A floor rather than a hope, since pip's default `only-if-needed` upgrade strategy keeps an installed 3.6.0 when the core is upgraded

@@ -913,6 +913,7 @@ class Viewer(Generic[H]):
         pan_speed=None,
         rotate_speed=None,
         zoom_speed=None,
+        cursor_pivot=None,
         deviation=None,
         angular_tolerance=None,
         edge_accuracy=None,
@@ -1058,6 +1059,8 @@ class Viewer(Generic[H]):
             pan_speed:               Speed of mouse panning (default=1)
             rotate_speed:            Speed of mouse rotate (default=1)
             zoom_speed:              Speed of mouse zoom (default=1)
+            cursor_pivot:            Rotate around and zoom towards the point under the cursor; False rotates
+                                     and zooms around the target (default=True)
 
         - Renderer
             deviation:               Shapes: Deviation from linear deflection value (default=0.1)
@@ -1331,6 +1334,7 @@ class Viewer(Generic[H]):
         pan_speed=None,
         rotate_speed=None,
         zoom_speed=None,
+        cursor_pivot=None,
         deviation=None,
         angular_tolerance=None,
         edge_accuracy=None,
@@ -1481,6 +1485,8 @@ class Viewer(Generic[H]):
             pan_speed:               Speed of mouse panning (default=1)
             rotate_speed:            Speed of mouse rotate (default=1)
             zoom_speed:              Speed of mouse zoom (default=1)
+            cursor_pivot:            Rotate around and zoom towards the point under the cursor; False rotates
+                                     and zooms around the target (default=True)
 
         - Renderer
             deviation:               Shapes: Deviation from linear deflection value (default=0.1)
@@ -1744,6 +1750,7 @@ class Viewer(Generic[H]):
         pan_speed=None,
         rotate_speed=None,
         zoom_speed=None,
+        cursor_pivot=None,
         deviation=None,
         angular_tolerance=None,
         edge_accuracy=None,
@@ -1871,6 +1878,8 @@ class Viewer(Generic[H]):
             pan_speed:               Speed of mouse panning (default=1)
             rotate_speed:            Speed of mouse rotate (default=1)
             zoom_speed:              Speed of mouse zoom (default=1)
+            cursor_pivot:            Rotate around and zoom towards the point under the cursor; False rotates
+                                     and zooms around the target (default=True)
 
         - Renderer
             deviation:               Shapes: Deviation from linear deflection value (default=0.1)

@@ -161,6 +161,7 @@ MOUSE = {
     "pan_speed": "panSpeed",
     "rotate_speed": "rotateSpeed",
     "zoom_speed": "zoomSpeed",
+    "cursor_pivot": "cursorPivot",
 }
 
 GRID = {
