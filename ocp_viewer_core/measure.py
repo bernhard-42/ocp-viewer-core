@@ -477,6 +477,15 @@ def calc_angle(shape1, shape2):
 
 
 def get_distance(shape1, shape2, center):
+    """The distance tool's response for two OCCT shapes."""
+    return distance_response(shape1, shape2, center, calc_distance, calc_angle)
+
+
+def distance_response(shape1, shape2, center, calc_distance, calc_angle):
+    """The distance tool's response: the distance, the points, and the angle where
+    there is one, from a kernel's `calc_distance(shape1, shape2, center)` and
+    `calc_angle(shape1, shape2)`. Kernel-free: `get_distance` passes this module's
+    OCCT functions, the backend a kernel plugin's (`plugins.py`)."""
     dist = calc_distance(shape1, shape2, center)
 
     result = [

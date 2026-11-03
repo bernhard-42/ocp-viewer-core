@@ -6,7 +6,7 @@ Jupyter CadQuery and build123d Studio. Each host supplies a transport and its
 own settings; everything above that is here.
 
 The package import carries the light submodules - `animation`, `colors`,
-`comms`, `config`, `keys`, `state`, `utils` - so the package root shows the
+`comms`, `config`, `keys`, `plugins`, `state`, `utils` - so the package root shows the
 same structure a host's does, and it stays kernel-free: importing the
 package must not load the tessellator or OCP. That property has a real
 consumer - build123d Studio's sidecar imports `comms` and `screenshot` and
@@ -48,7 +48,7 @@ viewer, and that is documentation, not a defect.
 # limitations under the License.
 #
 
-from . import animation, colors, comms, config, keys, state, utils
+from . import animation, colors, comms, config, keys, plugins, state, utils
 from ._version import __version__
 
 __all__ = [
@@ -58,6 +58,7 @@ __all__ = [
     "comms",
     "config",
     "keys",
+    "plugins",
     "state",
     "utils",
 ]

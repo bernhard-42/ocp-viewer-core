@@ -19,6 +19,7 @@ import base64
 import sys
 import traceback
 from dataclasses import dataclass
+from typing import Any
 
 from ocp_tessellate.ocp_utils import (
     deserialize,
@@ -36,7 +37,17 @@ from ocp_tessellate.trace import Trace
 
 from .comms import MessageType
 from .logo import logo
-from .measure import get_distance, get_properties
+from .measure import distance_response, get_distance, get_properties
+from .plugins import KernelPlugin, is_kernel_shape, plugin_of, register_plugin
+
+# `register_plugin` is a kernel plugin's one call into the core, made here by name
+# (`from ocp_viewer_core.backend import register_plugin`); the registry itself lives
+# in `plugins.py`, which the package root can carry without loading a kernel.
+__all__ = ["Tool", "ViewerBackend", "register_plugin"]
+
+# the kernels whose plugins this process has announced: once per process, since a
+# host may create a backend per show (Jupyter CadQuery does)
+_ANNOUNCED_KERNELS: set[str] = set()
 
 
 @dataclass
@@ -88,6 +99,12 @@ class ViewerBackend:
     `handle_event` returns the response, or None when there is nothing to say -
     every DATA message, and any UPDATES with no active tool, no selection, or a
     selection the active tool cannot use. **Callers must check.**
+
+    The model holds OCCT shapes, and the bodies of kernel plugins (`plugins.py`)
+    beside them: an entry whose shape carries a `kernel` tag is rebuilt by that
+    plugin's `load` and measured by its functions, every other entry by
+    `measure.py`. A distance between shapes of two kernels is answered with a
+    line saying so.
     """
 
     def __init__(self) -> None:
@@ -96,6 +113,8 @@ class ViewerBackend:
         # reads as an error - twelve of them, all describing the annotation
         # rather than the code.
         self.model: dict = {}
+        # the plugin of every id in the model, None for an OCCT shape
+        self.plugins: dict[str, KernelPlugin | None] = {}
         self.activated_tool = None
         self.filter_type = "none"  # The current active selection filter
 
@@ -158,6 +177,8 @@ class ViewerBackend:
             for v in model["parts"]:
                 if v.get("parts") is not None:
                     walk(v, trace)
+                elif is_kernel_shape(v["shape"]):
+                    self._load_kernel_entry(v)
                 else:
                     id_ = v["id"]
                     loc = (
@@ -183,41 +204,80 @@ class ViewerBackend:
                             if len(shape) > 1
                             else shape[0]
                         )
-                    self.model[id_] = compound.Moved(loc)  # ty: ignore[unresolved-attribute]
+                    self._add(id_, compound.Moved(loc), None)  # ty: ignore[unresolved-attribute]
                     faces = get_faces(compound)  # ty: ignore[invalid-argument-type]
                     for i, face in enumerate(faces):
                         trace.face(f"{id_}/faces/faces_{i}", face)
 
-                        self.model[f"{id_}/faces/faces_{i}"] = downcast(face.Moved(loc))
+                        self._add(f"{id_}/faces/faces_{i}", downcast(face.Moved(loc)), None)
                     edges = get_edges(compound)  # ty: ignore[invalid-argument-type]
                     for i, edge in enumerate(edges):
                         trace.edge(f"{id_}/edges/edges_{i}", edge)
 
-                        self.model[f"{id_}/edges/edges_{i}"] = (
-                            edge if loc is None else downcast(edge.Moved(loc))
+                        self._add(
+                            f"{id_}/edges/edges_{i}",
+                            edge if loc is None else downcast(edge.Moved(loc)),
+                            None,
                         )
                     vertices = get_vertices(compound)  # ty: ignore[invalid-argument-type]
                     for i, vertex in enumerate(vertices):
                         trace.vertex(f"{id_}/vertices/vertex_{i}", vertex)
 
-                        self.model[f"{id_}/vertices/vertices_{i}"] = (
-                            vertex if loc is None else downcast(vertex.Moved(loc))
+                        self._add(
+                            f"{id_}/vertices/vertices_{i}",
+                            vertex if loc is None else downcast(vertex.Moved(loc)),
+                            None,
                         )
 
         self.model = {}
+        self.plugins = {}
         trace = Trace("ocp-vscode-backend.log")
         walk(raw_model, trace)
         trace.close()
+
+    def _load_kernel_entry(self, entry):
+        """A kernel plugin's entry: its body rebuilt by the plugin, and its faces,
+        edges and vertices under the ids the viewer numbers them by."""
+        plugin = plugin_of(entry["shape"]["kernel"])
+        if plugin.kernel not in _ANNOUNCED_KERNELS:
+            _ANNOUNCED_KERNELS.add(plugin.kernel)
+            print_to_stdout(f"Measurement plugin for kernel '{plugin.kernel}' loaded ({plugin.load.__module__})")
+        id_ = entry["id"]
+        data = base64.b64decode(entry["shape"]["obj"].encode("utf-8"))
+        body, faces, edges, vertices = plugin.load(data, entry["loc"])
+        self._add(id_, body, plugin)
+        for i, face in enumerate(faces):
+            self._add(f"{id_}/faces/faces_{i}", face, plugin)
+        for i, edge in enumerate(edges):
+            self._add(f"{id_}/edges/edges_{i}", edge, plugin)
+        for i, vertex in enumerate(vertices):
+            self._add(f"{id_}/vertices/vertices_{i}", vertex, plugin)
+
+    def _add(self, id_, shape, plugin: KernelPlugin | None) -> None:
+        self.model[id_] = shape
+        self.plugins[id_] = plugin
+
+    def _kernel_of(self, id_) -> str:
+        """The kernel an id's shape belongs to, for the log: a plugin's tag, OCCT, or
+        unknown for an id the model does not hold."""
+        if id_ not in self.plugins:
+            return "unknown"
+        plugin = self.plugins[id_]
+        return "OCCT" if plugin is None else plugin.kernel
 
     def handle_properties(self, shape_id):
         """
         Request the properties of the object with the given id
         """
-        print_to_stdout(f"Identifier received '{shape_id}'")
+        print_to_stdout(f"{self._kernel_of(shape_id)} identifier received '{shape_id}'")
 
         shape = self.model[shape_id]
+        plugin = self.plugins.get(shape_id)
 
-        response = get_properties(shape)
+        if plugin is None:
+            response = get_properties(shape)
+        else:
+            response = plugin.get_properties(shape)
 
         response["type"] = "backend_response"
         response["subtype"] = "tool_response"
@@ -229,12 +289,31 @@ class ViewerBackend:
         """
         Request the distance between the two objects that have the given ids
         """
-        print_to_stdout(f"Identifiers received '{id1}', '{id2}'")
+        kernel1, kernel2 = self._kernel_of(id1), self._kernel_of(id2)
+        kernels = kernel1 if kernel1 == kernel2 else f"{kernel1}/{kernel2}"
+        print_to_stdout(f"{kernels} identifiers received '{id1}', '{id2}'")
 
         shape1 = self.model[id1]
         shape2 = self.model[id2]
+        plugin1 = self.plugins.get(id1)
+        plugin2 = self.plugins.get(id2)
 
-        response = get_distance(shape1, shape2, center)
+        response: dict[str, Any]
+        if plugin1 is not plugin2:
+            # one row: the panel prints a string value as it is, under its key's label
+            # (it skips a section's `info` key, which only annotates a distance
+            # number); without points there are no markers
+            response = {
+                "result": [{"distance": f"not measured: shapes of two kernels ({kernel1}, {kernel2})"}],
+                "refpoint1": None,
+                "refpoint2": None,
+            }
+        elif plugin1 is None:
+            response = get_distance(shape1, shape2, center)
+        else:
+            response = distance_response(
+                shape1, shape2, center, plugin1.calc_distance, plugin1.calc_angle
+            )
         response["type"] = "backend_response"
         response["subtype"] = "tool_response"
         response["tool_type"] = Tool.Distance

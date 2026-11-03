@@ -66,6 +66,7 @@ from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
 from .materials import vis_material_to_pbr
+from .plugins import encode_kernel_shapes
 from .utils import camera_keep_warning, camera_warning, ignore_camera_warnings
 
 # This module reaches OCP, through ocp_tessellate. That is why the package's
@@ -1249,7 +1250,10 @@ class Viewer(Generic[H]):
         # widget it was just handed and another by a port; both keep whatever
         # they need inside their own Comms, where knowing about widgets or
         # ports is legitimate.
-        self.comms.send_backend({"model": mapping}, timeit=timeit)
+        #
+        # The bodies of kernel plugins are serialized here, by their plugins
+        # (`plugins.py`); the codec writes the OCCT shapes.
+        self.comms.send_backend({"model": encode_kernel_shapes(mapping)}, timeit=timeit)
         return handle
 
     def reset_show(self):
