@@ -1,16 +1,16 @@
 """A kernel plugin of nothing but points, registering itself when imported - the way a
-real plugin's package does, and what an entry point of the group
-`ocp_viewer_core.backend` loads in the backend process.
+real plugin's module does, and what an entry point of the group
+`ocp_viewer.kernels.backend` loads in the backend process.
 
 A body is a list of points; it has no faces and no edges, and its points are its
-vertices. `serialize` writes them as JSON, `load` reads them back and applies the
-translation of a location (a quaternion is not applied: the toy is a transport
-test, not a geometry kernel)."""
+vertices. `serialize` writes them as JSON, which is `ShowProtocol`'s to call, `deserialize`
+reads them back, and `moved` applies the translation of a placement (a quaternion is not
+applied: the toy is a transport test, not a geometry kernel)."""
 
 import json
 from math import sqrt
 
-from ocp_viewer_core.backend import register_plugin
+from ocp_viewer_core.backend import BackendProtocol, register_plugin
 
 KERNEL = "toy"
 
@@ -19,37 +19,68 @@ def serialize(body):
     return json.dumps(body).encode("utf-8")
 
 
-def load(data, loc):
-    points = [tuple(p) for p in json.loads(data.decode("utf-8"))]
-    if loc is not None:
-        (tx, ty, tz), _ = loc
-        points = [(x + tx, y + ty, z + tz) for x, y, z in points]
-    return points, [], [], points
+def deserialize(data):
+    return [tuple(p) for p in json.loads(data.decode("utf-8"))]
 
 
-def get_properties(shape):
+def moved(shape, placement):
+    (tx, ty, tz), _ = placement
+    return [(x + tx, y + ty, z + tz) for x, y, z in shape]
+
+
+def parts(shape):
+    return [], [], shape
+
+
+def kind(shape):
+    return ("Compound", "Other") if isinstance(shape, list) else ("Vertex", "Point")
+
+
+def center(shape):
+    return shape[0] if isinstance(shape, list) else shape
+
+
+def properties(shape):
     if isinstance(shape, list):
-        return {"shape_type": "Compound", "geom_type": "Other", "refpoint": shape[0], "result": [{"points": len(shape)}]}
-    return {"shape_type": "Vertex", "geom_type": "Point", "refpoint": shape, "result": [{"xyz": shape}]}
+        return {"refpoint": shape[0]}
+    return {"refpoint": shape, "point": shape}
 
 
-def calc_distance(shape1, shape2, center=False):
+def closest_points(shape1, shape2):
     p1 = shape1[0] if isinstance(shape1, list) else shape1
     p2 = shape2[0] if isinstance(shape2, list) else shape2
-    dx, dy, dz = p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]
-    return {
-        "distance": sqrt(dx * dx + dy * dy + dz * dz),
-        "⇒ X | Y | Z": [abs(dx), abs(dy), abs(dz)],
-        "point 1": p1,
-        "point 2": p2,
-        "info": "center" if center else "min",
-        "refpoint1": p1,
-        "refpoint2": p2,
-    }
+    return sqrt(sum((b - a) ** 2 for a, b in zip(p1, p2))), p1, p2
 
 
-def calc_angle(shape1, shape2):
+def closest_directions(shape1, shape2):
     return None
 
 
-register_plugin(KERNEL, load, serialize, get_properties, calc_distance, calc_angle)
+class ToyBackend(BackendProtocol):
+    def deserialize(self, data):
+        return deserialize(data)
+
+    def moved(self, shape, placement):
+        return moved(shape, placement)
+
+    def parts(self, shape):
+        return parts(shape)
+
+    def kind(self, shape):
+        return kind(shape)
+
+    def center(self, shape):
+        return center(shape)
+
+    def properties(self, shape):
+        return properties(shape)
+
+    def closest_points(self, shape1, shape2):
+        return closest_points(shape1, shape2)
+
+    def closest_directions(self, shape1, shape2):
+        return closest_directions(shape1, shape2)
+
+
+BACKEND = ToyBackend()
+register_plugin(KERNEL, BACKEND, api=1)

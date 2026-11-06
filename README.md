@@ -35,7 +35,6 @@ Per-host imports stay per host:
 | `ocp_viewer_core/comms.py`  | the transport a host implements, and the session that caches what it answers                        |
 | `ocp_viewer_core/logo.py`   | the splash logo as measurable geometry, for a host's measurement backend                            |
 | `ocp_viewer_core/plugins.py` | the kernel plugins of the measurement backend: the registry, their entry point, and what their bodies travel as |
-| `ExternalKernel.md`          | the backend plugin protocol: how the objects of another kernel are measured                         |
 | `js/src/logo.js`            | the splash logo as tessellated data plus its config, for the renderer                               |
 | `js/`                       | the JavaScript half, published to npm                                                               |
 | `tests/`                    | including the conformance kit                                                                       |

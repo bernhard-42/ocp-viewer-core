@@ -19,12 +19,12 @@ import base64
 import sys
 import traceback
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ocp_tessellate.ocp_utils import (
+    Placement,
     deserialize,
     downcast,
-    identity_location,
     make_compound,
     tq_to_loc,
 )
@@ -37,18 +37,30 @@ from ocp_tessellate.trace import Trace
 
 from .comms import MessageType
 from .logo import logo
-from .measure import distance_response, get_distance, get_properties
-from .plugins import KernelPlugin, is_kernel_shape, plugin_of, register_plugin
+from .measure import (
+    distance_response,
+    occt_center,
+    occt_closest_directions,
+    occt_closest_points,
+    occt_kind,
+    occt_properties,
+    properties_response,
+)
+from .plugins import (
+    BackendProtocol,
+    ShapeProperties,
+    backend_of,
+    is_kernel_shape,
+    register_plugin,
+)
+
+if TYPE_CHECKING:
+    from ocp_tessellate.types import TopoDS_Shape  # noqa: F401 - named as a string by OcctBackend
 
 # `register_plugin` is a kernel plugin's one call into the core, made here by name
 # (`from ocp_viewer_core.backend import register_plugin`); the registry itself lives
 # in `plugins.py`, which the package root can carry without loading a kernel.
-__all__ = ["Tool", "ViewerBackend", "register_plugin"]
-
-# the kernels whose plugins this process has announced: once per process, since a
-# host may create a backend per show (Jupyter CadQuery does)
-_ANNOUNCED_KERNELS: set[str] = set()
-
+__all__ = ["BackendProtocol", "OcctBackend", "ShapeProperties", "Tool", "ViewerBackend", "register_plugin"]
 
 @dataclass
 class Tool:
@@ -56,6 +68,12 @@ class Tool:
 
     Distance = "DistanceMeasurement"
     Properties = "PropertiesMeasurement"
+
+
+def _placement_of(loc) -> Placement | None:
+    """A leaf's `loc` as it travels, JSON's `[[x, y, z], [x, y, z, w]]` or null, as what
+    `BackendProtocol.moved` takes."""
+    return None if loc is None else Placement(tuple(loc[0]), tuple(loc[1]))
 
 
 def print_to_stdout(*msg):
@@ -80,6 +98,48 @@ def error_handler(func):
     return wrapper
 
 
+class OcctBackend(BackendProtocol["TopoDS_Shape"]):
+    """OCCT's implementation of the protocol, for OCP and nanocct alike. An OCCT leaf of
+    edges or vertices arrives as one serialized shape per item, a body as one."""
+
+    def deserialize(self, data: bytes | list[bytes]):
+        """The shape of OCCT's BREP bytes, or of the list of them an OCCT leaf of edges or
+        vertices travels as: the codec writes OCCT's leaves, a plugin's come as one blob."""
+        if isinstance(data, list):
+            shapes = [deserialize(item) for item in data]
+            return make_compound(shapes) if len(shapes) > 1 else shapes[0]  # ty: ignore[invalid-argument-type]
+        return deserialize(data)
+
+    def moved(self, shape, placement):
+        return shape.Moved(tq_to_loc(*placement))
+
+    def parts(self, shape):
+        return (
+            [downcast(face) for face in get_faces(shape)],
+            [downcast(edge) for edge in get_edges(shape)],
+            [downcast(vertex) for vertex in get_vertices(shape)],
+        )
+
+    def kind(self, shape):
+        return occt_kind(shape)
+
+    def center(self, shape):
+        return occt_center(shape)
+
+    def properties(self, shape):
+        return occt_properties(shape)
+
+    def closest_points(self, shape1, shape2):
+        return occt_closest_points(shape1, shape2)
+
+    def closest_directions(self, shape1, shape2):
+        return occt_closest_directions(shape1, shape2)
+
+
+OCCT = "OCCT"
+_OCCT_BACKEND = OcctBackend()
+
+
 class ViewerBackend:
     """Exact geometry for a viewer's measurement tools.
 
@@ -101,10 +161,9 @@ class ViewerBackend:
     selection the active tool cannot use. **Callers must check.**
 
     The model holds OCCT shapes, and the bodies of kernel plugins (`plugins.py`)
-    beside them: an entry whose shape carries a `kernel` tag is rebuilt by that
-    plugin's `load` and measured by its functions, every other entry by
-    `measure.py`. A distance between shapes of two kernels is answered with a
-    line saying so.
+    beside them: an entry whose shape carries a `kernel` tag is rebuilt and measured
+    through that plugin's `BackendProtocol`, every other entry through `OcctBackend`.
+    A distance between shapes of two kernels is answered with a line saying so.
     """
 
     def __init__(self) -> None:
@@ -113,8 +172,9 @@ class ViewerBackend:
         # reads as an error - twelve of them, all describing the annotation
         # rather than the code.
         self.model: dict = {}
-        # the plugin of every id in the model, None for an OCCT shape
-        self.plugins: dict[str, KernelPlugin | None] = {}
+        # the kernel and its backend of every id in the model
+        self.kernels: dict[str, str] = {}
+        self.backends: dict[str, BackendProtocol] = {}
         self.activated_tool = None
         self.filter_type = "none"  # The current active selection filter
 
@@ -173,97 +233,69 @@ class ViewerBackend:
     def load_model(self, raw_model):
         """Read the transferred model from websocket"""
 
-        def walk(model, trace):
+        def walk(model):
             for v in model["parts"]:
                 if v.get("parts") is not None:
-                    walk(v, trace)
+                    walk(v)
                 elif is_kernel_shape(v["shape"]):
-                    self._load_kernel_entry(v)
+                    self._load_kernel_entry(v, trace)
+                elif isinstance(v["shape"], dict):
+                    data = base64.b64decode(v["shape"]["obj"].encode("utf-8"))
+                    self._load_entry(v["id"], OCCT, _OCCT_BACKEND, data, v["loc"], trace)
                 else:
-                    id_ = v["id"]
-                    loc = (
-                        identity_location()
-                        if v["loc"] is None
-                        else tq_to_loc(*v["loc"])
-                    )
-                    # `deserialize` is annotated as returning an optional
-                    # shape and never returns None for a payload the viewer
-                    # sent; the ignores describe ocp_tessellate's annotation,
-                    # not this code, and belong upstream.
-                    if isinstance(v["shape"], dict):
-                        compound = deserialize(
-                            base64.b64decode(v["shape"]["obj"].encode("utf-8"))
-                        )
-                    else:
-                        shape = [
-                            deserialize(base64.b64decode(s.encode("utf-8")))
-                            for s in v["shape"]
-                        ]
-                        compound = (
-                            make_compound(shape)  # ty: ignore[invalid-argument-type]
-                            if len(shape) > 1
-                            else shape[0]
-                        )
-                    self._add(id_, compound.Moved(loc), None)  # ty: ignore[unresolved-attribute]
-                    faces = get_faces(compound)  # ty: ignore[invalid-argument-type]
-                    for i, face in enumerate(faces):
-                        trace.face(f"{id_}/faces/faces_{i}", face)
-
-                        self._add(f"{id_}/faces/faces_{i}", downcast(face.Moved(loc)), None)
-                    edges = get_edges(compound)  # ty: ignore[invalid-argument-type]
-                    for i, edge in enumerate(edges):
-                        trace.edge(f"{id_}/edges/edges_{i}", edge)
-
-                        self._add(
-                            f"{id_}/edges/edges_{i}",
-                            edge if loc is None else downcast(edge.Moved(loc)),
-                            None,
-                        )
-                    vertices = get_vertices(compound)  # ty: ignore[invalid-argument-type]
-                    for i, vertex in enumerate(vertices):
-                        trace.vertex(f"{id_}/vertices/vertex_{i}", vertex)
-
-                        self._add(
-                            f"{id_}/vertices/vertices_{i}",
-                            vertex if loc is None else downcast(vertex.Moved(loc)),
-                            None,
-                        )
+                    data = [base64.b64decode(s.encode("utf-8")) for s in v["shape"]]
+                    self._load_entry(v["id"], OCCT, _OCCT_BACKEND, data, v["loc"], trace)
 
         self.model = {}
-        self.plugins = {}
+        self.backends = {}
+        self.kernels = {}
         trace = Trace("ocp-vscode-backend.log")
-        walk(raw_model, trace)
+        walk(raw_model)
         trace.close()
 
-    def _load_kernel_entry(self, entry):
-        """A kernel plugin's entry: its body rebuilt by the plugin, and its faces,
-        edges and vertices under the ids the viewer numbers them by."""
-        plugin = plugin_of(entry["shape"]["kernel"])
-        if plugin.kernel not in _ANNOUNCED_KERNELS:
-            _ANNOUNCED_KERNELS.add(plugin.kernel)
-            print_to_stdout(f"Measurement plugin for kernel '{plugin.kernel}' loaded ({plugin.load.__module__})")
-        id_ = entry["id"]
-        data = base64.b64decode(entry["shape"]["obj"].encode("utf-8"))
-        body, faces, edges, vertices = plugin.load(data, entry["loc"])
-        self._add(id_, body, plugin)
-        for i, face in enumerate(faces):
-            self._add(f"{id_}/faces/faces_{i}", face, plugin)
-        for i, edge in enumerate(edges):
-            self._add(f"{id_}/edges/edges_{i}", edge, plugin)
-        for i, vertex in enumerate(vertices):
-            self._add(f"{id_}/vertices/vertices_{i}", vertex, plugin)
+    def _load_kernel_entry(self, v, trace):
+        """A leaf of a kernel plugin. What fails with it, a missing plugin too, is the leaf's:
+        everything else of the scene stays measurable, and this leaf is an unknown id."""
+        kernel = v["shape"]["kernel"]
+        try:
+            data = base64.b64decode(v["shape"]["obj"].encode("utf-8"))
+            self._load_entry(v["id"], kernel, backend_of(kernel), data, v["loc"], trace)
+        except Exception as ex:  # noqa: BLE001
+            print_to_stdout(f"{kernel} shape '{v['id']}' not loaded: {ex!r}")
 
-    def _add(self, id_, shape, plugin: KernelPlugin | None) -> None:
+    def _load_entry(self, id_, kernel, backend, data, loc, trace):
+        """A shape rebuilt by its kernel's backend, and its faces, edges and vertices under
+        the ids the viewer numbers them by."""
+        shape = backend.deserialize(data=data)
+        placement = _placement_of(loc)
+        if placement is not None:
+            shape = backend.moved(shape=shape, placement=placement)
+        faces, edges, vertices = backend.parts(shape=shape)
+        self._add(id_, shape, kernel, backend)
+        # the trace reads OCCT's objects
+        is_occt = kernel == OCCT
+        for i, face in enumerate(faces):
+            if is_occt:
+                trace.face(f"{id_}/faces/faces_{i}", face)
+            self._add(f"{id_}/faces/faces_{i}", face, kernel, backend)
+        for i, edge in enumerate(edges):
+            if is_occt:
+                trace.edge(f"{id_}/edges/edges_{i}", edge)
+            self._add(f"{id_}/edges/edges_{i}", edge, kernel, backend)
+        for i, vertex in enumerate(vertices):
+            if is_occt:
+                trace.vertex(f"{id_}/vertices/vertex_{i}", vertex)
+            self._add(f"{id_}/vertices/vertices_{i}", vertex, kernel, backend)
+
+    def _add(self, id_, shape, kernel: str, backend: BackendProtocol) -> None:
         self.model[id_] = shape
-        self.plugins[id_] = plugin
+        self.kernels[id_] = kernel
+        self.backends[id_] = backend
 
     def _kernel_of(self, id_) -> str:
         """The kernel an id's shape belongs to, for the log: a plugin's tag, OCCT, or
         unknown for an id the model does not hold."""
-        if id_ not in self.plugins:
-            return "unknown"
-        plugin = self.plugins[id_]
-        return "OCCT" if plugin is None else plugin.kernel
+        return self.kernels.get(id_, "unknown")
 
     def handle_properties(self, shape_id):
         """
@@ -271,13 +303,8 @@ class ViewerBackend:
         """
         print_to_stdout(f"{self._kernel_of(shape_id)} identifier received '{shape_id}'")
 
-        shape = self.model[shape_id]
-        plugin = self.plugins.get(shape_id)
-
-        if plugin is None:
-            response = get_properties(shape)
-        else:
-            response = plugin.get_properties(shape)
+        backend, shape = self.backends[shape_id], self.model[shape_id]
+        response = properties_response(backend.kind(shape=shape), backend.properties(shape=shape))
 
         response["type"] = "backend_response"
         response["subtype"] = "tool_response"
@@ -295,11 +322,10 @@ class ViewerBackend:
 
         shape1 = self.model[id1]
         shape2 = self.model[id2]
-        plugin1 = self.plugins.get(id1)
-        plugin2 = self.plugins.get(id2)
+        backend1 = self.backends[id1]
 
         response: dict[str, Any]
-        if plugin1 is not plugin2:
+        if backend1 is not self.backends[id2]:
             # one row: the panel prints a string value as it is, under its key's label
             # (it skips a section's `info` key, which only annotates a distance
             # number); without points there are no markers
@@ -308,11 +334,15 @@ class ViewerBackend:
                 "refpoint1": None,
                 "refpoint2": None,
             }
-        elif plugin1 is None:
-            response = get_distance(shape1, shape2, center)
         else:
             response = distance_response(
-                shape1, shape2, center, plugin1.calc_distance, plugin1.calc_angle
+                shape1,
+                shape2,
+                center,
+                backend1.kind,
+                backend1.center,
+                backend1.closest_points,
+                backend1.closest_directions,
             )
         response["type"] = "backend_response"
         response["subtype"] = "tool_response"

@@ -53,6 +53,8 @@ from ocp_tessellate.ocp_utils import (
     volume,
 )
 
+from .plugins import ShapeProperties
+
 
 def with_supplement(angle):
     """An angle in degrees and its supplement, as the panel shows them: "60.000 (120.000)".
@@ -109,13 +111,30 @@ def get_geom_type(shape):
         return "Unknown"
 
 
-def get_properties(shape):
-    shape = downcast(shape)
-    shape_type = get_shape_type(shape)
-    geom_type = get_geom_type(shape)
+def _xyz(direction) -> tuple[float, float, float]:
+    return (direction.X(), direction.Y(), direction.Z())
 
-    refpoint = None
-    sections = []
+
+def occt_kind(shape) -> tuple[str, str]:
+    """What an OCCT shape is, as `BackendProtocol.kind` gives it."""
+    shape = downcast(shape)
+    return get_shape_type(shape), get_geom_type(shape)
+
+
+def occt_center(shape):
+    """The center of an OCCT shape, as `BackendProtocol.center` gives it: None for a degenerated
+    edge, which has none."""
+    try:
+        return get_center(downcast(shape))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def occt_properties(shape) -> ShapeProperties:
+    """What OCCT knows about a shape, as `BackendProtocol.properties` gives it."""
+    shape = downcast(shape)
+    geom_type = get_geom_type(shape)
+    props: ShapeProperties = {"refpoint": None}
 
     # The dispatch repeats get_shape_type's tests rather than comparing its
     # string: the predicates are TypeIs, so each branch holds the exact
@@ -123,201 +142,243 @@ def get_properties(shape):
     # wrapped survives the downcast above.
     if is_topods_vertex(shape):
         pt = get_point(shape)
-        refpoint = pt
-        sections.append({"xyz": pt})
+        props["refpoint"] = pt
+        props["point"] = pt
 
     elif is_topods_edge(shape):
-        geom_section = {}
-        pos_section = {}
+        # A degenerated edge has no positions, and no row for them: what it has, its kind,
+        # still answers the distance tool.
+        try:
+            props["refpoint"] = get_point(position_at(shape, 0.5))
 
-        if geom_type == "Line":
-            pos_section["start"] = get_point(position_at(shape, 0))
-            pos_section["middle"] = get_point(position_at(shape, 0.5))
-            pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0.5))
+            if geom_type == "Circle":
+                circle = get_curve(shape).Circle()
+                props["center"] = get_point(circle.Location())
+                props["radius"] = circle.Radius()
+                props["start"] = get_point(position_at(shape, 0))
+                if not is_closed(shape):
+                    props["end"] = get_point(position_at(shape, 1))
+                else:
+                    props["refpoint"] = get_point(position_at(shape, 0))
 
-        elif geom_type == "Circle":
-            circle = get_curve(shape).Circle()
-            geom_section["center"] = get_point(circle.Location())
-            geom_section["radius / diam"] = (
-                f"{circle.Radius():.3f} /  {2 * circle.Radius():.3f}"
-            )
-            pos_section["start"] = get_point(position_at(shape, 0))
-            if not is_closed(shape):
-                pos_section["end"] = get_point(position_at(shape, 1))
-                refpoint = get_point(position_at(shape, 0.5))
+            elif geom_type == "Ellipse":
+                ellipse = get_curve(shape).Ellipse()
+                props["center"] = get_point(ellipse.Location())
+                props["major_radius"] = ellipse.MajorRadius()
+                props["minor_radius"] = ellipse.MinorRadius()
+                props["start"] = get_point(position_at(shape, 0))
+                if not is_closed(shape):
+                    props["end"] = get_point(position_at(shape, 1))
+                else:
+                    props["refpoint"] = get_point(position_at(shape, 0))
+
+            elif geom_type == "Hyperbola":
+                props["start"] = get_point(position_at(shape, 0))
+                props["vertex"] = get_point(get_curve(shape).Hyperbola().Location())
+                props["end"] = get_point(position_at(shape, 1))
+
+            elif geom_type == "Parabola":
+                props["start"] = get_point(position_at(shape, 0))
+                props["vertex"] = get_point(get_curve(shape).Parabola().Location())
+                props["end"] = get_point(position_at(shape, 1))
+
+            elif geom_type == "OffsetCurve":
+                props["offset"] = get_curve(shape).OffsetCurve().Offset()
+                props["start"] = get_point(position_at(shape, 0))
+                if is_closed(shape):
+                    props["end"] = get_point(position_at(shape, 1))
+                props["refpoint"] = get_point(position_at(shape, 0))
+
             else:
-                refpoint = get_point(position_at(shape, 0))
+                props["start"] = get_point(position_at(shape, 0))
+                props["middle"] = get_point(position_at(shape, 0.5))
+                props["end"] = get_point(position_at(shape, 1))
 
-        elif geom_type == "Ellipse":
-            ellipse = get_curve(shape).Ellipse()
-            geom_section["center"] = get_point(ellipse.Location())
-            geom_section["major radius / diam"] = (
-                f"{ellipse.MajorRadius():.3f} /  {2 * ellipse.MajorRadius():.3f}"
-            )
-            geom_section["minor radius / diam"] = (
-                f"{ellipse.MinorRadius():.3f} /  {2 * ellipse.MinorRadius():.3f}"
-            )
-            pos_section["start"] = get_point(position_at(shape, 0))
-            if not is_closed(shape):
-                pos_section["end"] = get_point(position_at(shape, 1))
-                refpoint = get_point(position_at(shape, 0.5))
-            else:
-                refpoint = get_point(position_at(shape, 0))
+        except Exception:  # noqa: BLE001, S110
+            pass
 
-        elif geom_type == "Hyperbola":
-            hyperbola = get_curve(shape).Hyperbola()
-            pos_section["start"] = get_point(position_at(shape, 0))
-            pos_section["vertex"] = get_point(hyperbola.Location())
-            pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0.5))
-
-        elif geom_type == "Parabola":
-            parabola = get_curve(shape).Parabola()
-            pos_section["start"] = get_point(position_at(shape, 0))
-            pos_section["vertex"] = get_point(parabola.Location())
-            pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0.5))
-
-        elif geom_type in ["Bezier", "Bspline"]:
-            pos_section["start"] = get_point(position_at(shape, 0))
-            pos_section["middle"] = get_point(position_at(shape, 0.5))
-            pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0.5))
-
-        elif geom_type == "OffsetCurve":
-            offset = get_curve(shape).OffsetCurve()
-            geom_section["offset"] = offset.Offset()
-            pos_section["start"] = get_point(position_at(shape, 0))
-            if is_closed(shape):
-                pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0))
-
-        else:
-            pos_section["start"] = get_point(position_at(shape, 0))
-            pos_section["middle"] = get_point(position_at(shape, 0.5))
-            pos_section["end"] = get_point(position_at(shape, 1))
-            refpoint = get_point(position_at(shape, 0.5))
-
-        if geom_section:
-            sections.append(geom_section)
-        if pos_section:
-            sections.append(pos_section)
-
-        meas_section = {"length": length(shape)}
-        for i in [0, 1]:
+        props["length"] = length(shape)
+        for key, parameter in (("tangent_start", 0), ("tangent_end", 1)):
             try:
-                _, tangent_dir = tangent_at(shape, i)
-                angle = abs(90 - angle_between(tangent_dir, (0, 0, 1)) / pi * 180)
-                meas_section[f"angle@{i} to XY"] = with_supplement(angle)
+                _, tangent_dir = tangent_at(shape, parameter)
+                props[key] = _xyz(tangent_dir)
             # An angle that cannot be computed is left out of the section
             # rather than failing the measurement.
             except Exception:  # noqa: BLE001, S110
                 pass
-        sections.append(meas_section)
 
     elif is_topods_face(shape):
-        geom_section = {}
-
         if geom_type == "Plane":
-            plane = get_surface(shape).Plane()
-            geom_section["center"] = get_point(plane.Location())
+            props["center"] = get_point(get_surface(shape).Plane().Location())
 
         elif geom_type == "Cylinder":
             cylinder = get_surface(shape).Cylinder()
-            geom_section["center"] = get_point(cylinder.Location())
-            geom_section["radius"] = cylinder.Radius()
+            props["center"] = get_point(cylinder.Location())
+            props["radius"] = cylinder.Radius()
 
         elif geom_type == "Cone":
             cone = get_surface(shape).Cone()
-            geom_section["center"] = get_point(cone.Location())
-            geom_section["base radius"] = cone.RefRadius()
-            geom_section["half angle"] = cone.SemiAngle() / pi * 180
+            props["center"] = get_point(cone.Location())
+            props["base_radius"] = cone.RefRadius()
+            props["half_angle"] = cone.SemiAngle() / pi * 180
 
         elif geom_type == "Sphere":
             sphere = get_surface(shape).Sphere()
-            geom_section["center"] = get_point(sphere.Location())
-            geom_section["radius"] = sphere.Radius()
+            props["center"] = get_point(sphere.Location())
+            props["radius"] = sphere.Radius()
 
         elif geom_type == "Torus":
             torus = get_surface(shape).Torus()
-            geom_section["center"] = get_point(torus.Location())
-            geom_section["minor radius"] = torus.MinorRadius()
-            geom_section["major radius"] = torus.MajorRadius()
+            props["center"] = get_point(torus.Location())
+            props["minor_radius"] = torus.MinorRadius()
+            props["major_radius"] = torus.MajorRadius()
 
         elif geom_type == "SurfaceOfRevolution":
             revolution = get_surface(shape)
-            geom_section["axe loc"] = get_point(
-                revolution.AxeOfRevolution().Location()
-            )
-            # A direction, deliberately - the label says so. `get_point` reads
-            # X(), Y() and Z() and nothing else, which gp_Dir has; its
-            # annotation is narrower than what it actually requires.
-            geom_section["axe dir"] = get_point(
-                revolution.AxeOfRevolution().Direction()  # ty: ignore[invalid-argument-type]
-            )
-            geom_type = "Revolution"
+            props["axis_location"] = get_point(revolution.AxeOfRevolution().Location())
+            props["axis_direction"] = _xyz(revolution.AxeOfRevolution().Direction())
 
-        # Two unimplemented cases rather than one: they are separate pieces of
-        # work, and collapsing them into one branch would hide that.
-        elif geom_type == "Bezier":  # noqa: SIM114
-            ...
-
-        elif geom_type == "Bspline":
-            ...
-
-        if geom_section:
-            sections.append(geom_section)
-
-        refpoint = center_of_geometry(shape)
-
-        meas_section = {"area": area(shape)}
+        props["refpoint"] = center_of_geometry(shape)
+        props["area"] = area(shape)
         try:
             normal = face_normal(shape)
             if normal is not None:
-                a = angle_between(normal, (0, 0, 1)) / pi * 180
-                meas_section["angle to XY"] = with_supplement(a)
+                props["normal"] = _xyz(normal)
         # As above: the angle is one line of a report, not the report.
         except Exception:  # noqa: BLE001, S110
             pass
-        sections.append(meas_section)
 
     elif is_topods_wire(shape):
-        sections.append({"length": length(shape)})
-        refpoint = center_of_mass(shape)
+        props["length"] = length(shape)
+        props["refpoint"] = center_of_mass(shape)
 
     elif is_topods_shell(shape):
-        sections.append({"area": area(shape)})
-        refpoint = center_of_mass(shape)
+        props["area"] = area(shape)
+        props["refpoint"] = center_of_mass(shape)
 
     elif (
         is_topods_solid(shape)
         or is_topods_compsolid(shape)
         or is_topods_compound(shape)
     ):
-        sections.append({"volume": volume(shape)})
-        refpoint = center_of_mass(shape)
+        props["volume"] = volume(shape)
+        props["refpoint"] = center_of_mass(shape)
 
     else:
         print(f"unknown shape {type(shape)}")
 
-    if shape_type != "Vertex":
+    if get_shape_type(shape) != "Vertex":
         bb = BoundingBox(shape, optimal=True)
-        sections.append({
-            "bb": {
-                "min": [bb.xmin, bb.ymin, bb.zmin],
-                "center": bb.center,
-                "max": [bb.xmax, bb.ymax, bb.zmax],
-                "size": [bb.xsize, bb.ysize, bb.zsize],
+        props["bb_min"] = (bb.xmin, bb.ymin, bb.zmin)
+        props["bb_max"] = (bb.xmax, bb.ymax, bb.zmax)
+
+    return props
+
+
+# the panel's rows of a shape, in their order: (key of its properties, the row's label, how
+# the value is shown)
+
+
+def _radius_and_diameter(radius: float) -> str:
+    return f"{radius:.3f} /  {2 * radius:.3f}"
+
+
+def _angle_to_xy(direction) -> str:
+    return with_supplement(angle_between(direction, (0, 0, 1)) / pi * 180)
+
+
+def _edge_angle_to_xy(direction) -> str:
+    return with_supplement(abs(90 - angle_between(direction, (0, 0, 1)) / pi * 180))
+
+
+def _as_is(value):
+    return value
+
+
+_EDGE_GEOMETRY_ROWS = (
+    ("center", "center", _as_is),
+    ("radius", "radius / diam", _radius_and_diameter),
+    ("major_radius", "major radius / diam", _radius_and_diameter),
+    ("minor_radius", "minor radius / diam", _radius_and_diameter),
+    ("offset", "offset", _as_is),
+)
+_EDGE_POSITION_ROWS = (
+    ("start", "start", _as_is),
+    ("vertex", "vertex", _as_is),
+    ("middle", "middle", _as_is),
+    ("end", "end", _as_is),
+)
+_EDGE_MEASURE_ROWS = (
+    ("length", "length", _as_is),
+    ("tangent_start", "angle@0 to XY", _edge_angle_to_xy),
+    ("tangent_end", "angle@1 to XY", _edge_angle_to_xy),
+)
+_FACE_GEOMETRY_ROWS = (
+    ("center", "center", _as_is),
+    ("radius", "radius", _as_is),
+    ("base_radius", "base radius", _as_is),
+    ("half_angle", "half angle", _as_is),
+    ("minor_radius", "minor radius", _as_is),
+    ("major_radius", "major radius", _as_is),
+    ("axis_location", "axe loc", _as_is),
+    ("axis_direction", "axe dir", _as_is),
+)
+_FACE_MEASURE_ROWS = (
+    ("area", "area", _as_is),
+    ("normal", "angle to XY", _angle_to_xy),
+)
+_BODY_ROWS = (
+    ("length", "length", _as_is),
+    ("area", "area", _as_is),
+    ("volume", "volume", _as_is),
+)
+
+
+def _section(props: ShapeProperties, rows) -> dict:
+    return {label: show(props[key]) for key, label, show in rows if key in props}
+
+
+def properties_response(kind: tuple[str, str], props: ShapeProperties) -> dict:
+    """The properties tool's response, the panel's rows and sections, from what a kernel
+    knows about a shape. Kernel-free: the same for OCCT and every plugin."""
+    shape_type, geom_type = kind
+    if shape_type == "Vertex":
+        if "point" not in props:
+            raise ValueError("the properties of a Vertex need 'point'")
+        sections = [{"xyz": props["point"]}]
+    elif shape_type == "Edge":
+        sections = [_section(props, _EDGE_GEOMETRY_ROWS), _section(props, _EDGE_POSITION_ROWS), _section(props, _EDGE_MEASURE_ROWS)]
+    elif shape_type == "Face":
+        sections = [_section(props, _FACE_GEOMETRY_ROWS), _section(props, _FACE_MEASURE_ROWS)]
+    else:
+        sections = [_section(props, _BODY_ROWS)]
+    sections = [section for section in sections if len(section) > 0]
+
+    if "bb_min" in props and "bb_max" in props:
+        low, high = props["bb_min"], props["bb_max"]
+        size = [high[i] - low[i] for i in range(3)]
+        sections.append(
+            {
+                "bb": {
+                    "min": list(low),
+                    "center": tuple(low[i] + size[i] / 2.0 for i in range(3)),
+                    "max": list(high),
+                    "size": size,
+                }
             }
-        })
+        )
 
     return {
         "shape_type": shape_type,
-        "geom_type": geom_type,
-        "refpoint": refpoint,
+        "geom_type": "Revolution" if geom_type == "SurfaceOfRevolution" else geom_type,
+        "refpoint": props["refpoint"],
         "result": sections,
     }
+
+
+def get_properties(shape):
+    """The properties tool's response for an OCCT shape."""
+    return properties_response(occt_kind(shape), occt_properties(shape))
 
 
 def get_center(shape):
@@ -390,26 +451,35 @@ def get_center(shape):
     return get_point(center)
 
 
-def calc_distance(shape1, shape2, center=False):
-    shape1 = downcast(shape1)
-    shape2 = downcast(shape2)
+def occt_closest_points(shape1, shape2):
+    """The minimum distance of two OCCT shapes and the points it is taken between."""
+    dist, p1, p2 = dist_shapes(downcast(shape1), downcast(shape2))
+    return dist, get_point(p1), get_point(p2)
 
+
+def occt_closest_directions(shape1, shape2):
+    """The tangents of edges and normals of faces at the closest points of two OCCT shapes."""
+    # edges or faces: `_angle_values` asks only for those, which downcast's type cannot say
+    directions = closest_directions(downcast(shape1), downcast(shape2))  # ty: ignore[invalid-argument-type]
+    if directions is None:
+        return None
+    return _xyz(directions[0]), _xyz(directions[1])
+
+
+def _distance_values(shape1, shape2, center, center_of, closest_points):
     if center:
-        p1 = get_center(shape1)
-        p2 = get_center(shape2)
+        p1 = center_of(shape=shape1)
+        p2 = center_of(shape=shape2)
+        if p1 is None or p2 is None:
+            return None
         # the distance of two points, as BRepExtrema computes it for two vertices
         dx, dy, dz = p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]
         dist = sqrt(dx * dx + dy * dy + dz * dz)
     else:
-        dist, p1, p2 = dist_shapes(shape1, shape2)
-        p1 = get_point(p1)
-        p2 = get_point(p2)
-    xdist = abs(p2[0] - p1[0])
-    ydist = abs(p2[1] - p1[1])
-    zdist = abs(p2[2] - p1[2])
+        dist, p1, p2 = closest_points(shape1=shape1, shape2=shape2)
     return {
         "distance": dist,
-        "⇒ X | Y | Z": [xdist, ydist, zdist],
+        "⇒ X | Y | Z": [abs(p2[0] - p1[0]), abs(p2[1] - p1[1]), abs(p2[2] - p1[2])],
         "point 1": p1,
         "point 2": p2,
         "info": "center" if center else "min",
@@ -418,36 +488,29 @@ def calc_distance(shape1, shape2, center=False):
     }
 
 
-def _direction_label(shape, shape_index):
-    """What the direction of a shape in calc_angle is: a tangent or a normal."""
-    if is_topods_edge(shape):
-        if get_geom_type(shape) == "Line":
+def _direction_label(kind, shape_index):
+    """What the direction of a shape is: a tangent or a normal."""
+    shape_type, geom_type = kind
+    if shape_type == "Edge":
+        if geom_type == "Line":
             return "line"
         return f"tangent at P{shape_index}"
-    if get_geom_type(shape) == "Plane":
+    if geom_type == "Plane":
         return "face normal"
     return f"surface normal at P{shape_index}"
 
 
-def calc_angle(shape1, shape2):
-    shape1 = downcast(shape1)
-    shape2 = downcast(shape2)
-
-    is_edge1 = is_topods_edge(shape1)
-    is_face1 = is_topods_face(shape1)
-    is_edge2 = is_topods_edge(shape2)
-    is_face2 = is_topods_face(shape2)
-
-    if not (is_edge1 or is_face1) or not (is_edge2 or is_face2):
+def _angle_values(kind1, kind2, shape1, shape2, closest_directions):
+    is_edge1 = kind1[0] == "Edge"
+    is_edge2 = kind2[0] == "Edge"
+    if not (is_edge1 or kind1[0] == "Face") or not (is_edge2 or kind2[0] == "Face"):
         return None
 
     # tangents of edges, normals of faces, at the closest points
-    directions = closest_directions(shape1, shape2)
+    directions = closest_directions(shape1=shape1, shape2=shape2)
     if directions is None:
         return None
     dir1, dir2 = directions
-    info1 = _direction_label(shape1, 1)
-    info2 = _direction_label(shape2, 2)
 
     angle = angle_between(dir1, dir2) / pi * 180
 
@@ -456,37 +519,37 @@ def calc_angle(shape1, shape2):
     if is_edge1 != is_edge2:
         angle = abs(90 - angle)
 
-    def _dir_tuple(d):
-        return (d.X(), d.Y(), d.Z())
-
     response = {"angle": angle}
-
-    response["reference 1"] = info1
-    if is_edge1:
-        response["direction 1"] = _dir_tuple(dir1)
-    else:
-        response["normal 1"] = _dir_tuple(dir1)
-
-    response["reference 2"] = info2
-    if is_edge2:
-        response["direction 2"] = _dir_tuple(dir2)
-    else:
-        response["normal 2"] = _dir_tuple(dir2)
-
+    response["reference 1"] = _direction_label(kind1, 1)
+    response["direction 1" if is_edge1 else "normal 1"] = dir1
+    response["reference 2"] = _direction_label(kind2, 2)
+    response["direction 2" if is_edge2 else "normal 2"] = dir2
     return response
+
+
+def calc_distance(shape1, shape2, center=False):
+    """The distance values of two OCCT shapes, None in the center mode if one has no center."""
+    return _distance_values(shape1, shape2, center, occt_center, occt_closest_points)
+
+
+def calc_angle(shape1, shape2):
+    """The angle values of two OCCT shapes, None for anything but edges and faces."""
+    return _angle_values(occt_kind(shape1), occt_kind(shape2), shape1, shape2, occt_closest_directions)
 
 
 def get_distance(shape1, shape2, center):
     """The distance tool's response for two OCCT shapes."""
-    return distance_response(shape1, shape2, center, calc_distance, calc_angle)
+    return distance_response(shape1, shape2, center, occt_kind, occt_center, occt_closest_points, occt_closest_directions)
 
 
-def distance_response(shape1, shape2, center, calc_distance, calc_angle):
-    """The distance tool's response: the distance, the points, and the angle where
-    there is one, from a kernel's `calc_distance(shape1, shape2, center)` and
-    `calc_angle(shape1, shape2)`. Kernel-free: `get_distance` passes this module's
-    OCCT functions, the backend a kernel plugin's (`plugins.py`)."""
-    dist = calc_distance(shape1, shape2, center)
+def distance_response(shape1, shape2, center, kind, center_of, closest_points, closest_directions):
+    """The distance tool's response: the distance, the points, and the angle where there is
+    one, from what a kernel gives. Kernel-free: `get_distance` passes this module's OCCT
+    functions, the backend a kernel plugin's (`plugins.py`)."""
+    dist = _distance_values(shape1, shape2, center, center_of, closest_points)
+    if dist is None:
+        # one row, without points there are no markers, as for shapes of two kernels
+        return {"result": [{"distance": "not measured: a shape without a center"}], "refpoint1": None, "refpoint2": None}
 
     result = [
         {
@@ -500,7 +563,7 @@ def distance_response(shape1, shape2, center, calc_distance, calc_angle):
         },
     ]
 
-    angle = calc_angle(shape1, shape2)
+    angle = _angle_values(kind(shape=shape1), kind(shape=shape2), shape1, shape2, closest_directions)
 
     if angle is not None:
         angle_section = {"angle": with_supplement(angle["angle"])}

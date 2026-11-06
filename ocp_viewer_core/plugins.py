@@ -1,34 +1,24 @@
-"""Kernel plugins of the measurement backend: the registry, and what their bodies travel as.
+"""Kernel plugins of the measurement backend: the protocol, the registry, and what their
+shapes travel as.
 
 The backend (`backend.py`) answers the viewer's measurement tools from the geometry
-behind the mesh. That geometry is OCCT's unless an ocp-tessellate kernel plugin
-(`ocp_tessellate.plugin`, e.g. ocp-viewer-smlibpy for SMLib) drew the object; then
-the plugin's kernel holds it, and the plugin registers here what the backend needs:
+behind the mesh. A plugin (`ocp_tessellate.plugin`, e.g. ocp-viewer-smlibpy for SMLib)
+implements `BackendProtocol` for its kernel, and `backend.OcctBackend` does for OCCT, so
+the backend treats them alike. It is required of a plugin, because every leaf of a shown
+object has an entry in the model.
 
-- `serialize(body) -> bytes`: the body as bytes, since every host runs the backend
-  in another process than the user's (VS Code's `python -m ocp_vscode --backend`,
-  Jupyter CadQuery's server extension, ocp-viewer's server, build123d Studio's
-  sidecar) and the model reaches it as JSON
-- `load(data, loc) -> (body, faces, edges, vertices)`: the body rebuilt from the bytes
-  and moved by `loc` (a translation and a quaternion, as `loc_to_tq` writes them, or
-  None), with its faces, edges and vertices in the order the mesh numbers them -
-  the viewer selects `{id}/faces/faces_{i}` and the backend answers for index i
-- `get_properties(shape)`, `calc_distance(shape1, shape2, center)` and
-  `calc_angle(shape1, shape2)`: the measurements, answering in the layout of
-  `measure.py`'s functions of the same names
+`register_plugin(kernel, backend, api=1)` is the one mechanism. A plugin calls it in a module of
+its own. The backend process imports no user code, so that module is reached through an entry
+point of the group `ocp_viewer.kernels.backend` named like the kernel: `backend_of` loads it on
+the first model that carries the kernel. The process that shows needs none of this: what
+draws and what serializes is `ShowProtocol` of ocp_tessellate.
 
-`register_plugin(kernel, ...)` is the one mechanism. A plugin calls it when it is
-imported, which covers the process that shows. The backend process imports no user
-code, so there it is reached through an entry point of the group
-`ocp_viewer_core.backend` named like the kernel, whose value is the plugin's module:
-`plugin_of` loads it on the first model that carries the kernel.
+The protocol as a whole is described in the docs: https://bernhard-42.github.io/ocp_viewer_docs/plugins/backend/
 
-The protocol as a whole is described in ExternalKernel.md.
-
-On the wire a kernel body is a model entry whose shape is `{"kernel": tag, "obj":
-body}`, as `OcpExternalObject.collect` emits it; `encode_kernel_shapes` turns the body
-into base64 of `serialize(body)` before the model is sent, so the codec never sees it.
-An OCCT entry has no `kernel` key.
+On the wire a kernel's shape is a model entry whose shape is `{"kernel": tag, "obj":
+shape}`, as `OcpObject.collect` emits it; `ocp_tessellate.kernels.encode_kernel_shapes` turns
+it into base64 of the plugin's `ShowProtocol.serialize` before the model is sent, so the codec
+never sees it. An OCCT entry has no `kernel` key.
 
 This module is light on purpose: the package root carries it, and it must not load
 a kernel (see `__init__.py`).
@@ -50,83 +40,172 @@ a kernel (see `__init__.py`).
 # limitations under the License.
 #
 
-import base64
-from collections.abc import Callable
-from dataclasses import dataclass
+from __future__ import annotations
+
+from abc import abstractmethod
 from importlib.metadata import entry_points
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol, TypedDict, TypeVar, runtime_checkable
 
-# the entry point group a plugin's package declares, so the backend process finds it:
-# `[project.entry-points."ocp_viewer_core.backend"] smlib = "ocp_viewer_smlibpy"`
-ENTRY_POINT_GROUP = "ocp_viewer_core.backend"
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
+    # types only: this module must not load a kernel
+    from ocp_tessellate.ocp_utils.location import Placement
 
-@dataclass(frozen=True)
-class KernelPlugin:
-    """The five functions a kernel plugin registers, under its kernel tag."""
-
-    kernel: str
-    load: Callable[[bytes, Any], tuple[Any, list[Any], list[Any], list[Any]]]
-    serialize: Callable[[Any], bytes]
-    get_properties: Callable[[Any], dict[str, Any]]
-    calc_distance: Callable[[Any, Any, bool], dict[str, Any]]
-    calc_angle: Callable[[Any, Any], dict[str, Any] | None]
+# the entry point group of what a kernel plugin measures with, keyed by its kernel tag, whose
+# value is the module that registers it, so the backend process finds it:
+# `[project.entry-points."ocp_viewer.kernels.backend"] smlib = "ocp_viewer_smlibpy.backend"`.
+# ocp_tessellate reads `ocp_viewer.kernels.show` in the process that shows
+ENTRY_POINT_GROUP = "ocp_viewer.kernels.backend"
 
 
-PLUGINS: dict[str, KernelPlugin] = {}
+# What a plugin's shapes are, named when it subclasses the protocol, as in
+# `BackendProtocol[Body | Face | Edge | Vertex]`, so a type checker checks it against them.
+ShapeT = TypeVar("ShapeT")
 
 
-def register_plugin(kernel, load, serialize, get_properties, calc_distance, calc_angle) -> None:
-    """Register a kernel's backend functions under its tag; a second registration
-    of the same tag replaces the first."""
-    PLUGINS[kernel] = KernelPlugin(kernel, load, serialize, get_properties, calc_distance, calc_angle)
+Point = tuple[float, float, float]
 
 
-def plugin_of(kernel: str) -> KernelPlugin:
-    """The plugin registered for a kernel, loading its entry point first if it is not.
+class _KnownOfEveryShape(TypedDict):
+    refpoint: Point | None
 
-    LookupError when neither registered nor declared: the message names both ways.
+
+class ShapeProperties(_KnownOfEveryShape, total=False):
+    """What a kernel knows about a shape, as plain numbers. The core makes the panel's rows
+    and strings of it, for OCCT and every plugin alike. Only the properties tool asks for it, so
+    it may take its time: an exact bounding box of a large solid takes most of a second.
+
+    `refpoint`: where the panel's marker points to. The rest is what the kernel has for the
+    shape: a key that is left out has no row. A vertex needs `point`."""
+
+    point: Point
+    center: Point
+    radius: float
+    major_radius: float
+    minor_radius: float
+    base_radius: float
+    half_angle: float
+    offset: float
+    axis_location: Point
+    axis_direction: Point
+    start: Point
+    middle: Point
+    end: Point
+    vertex: Point
+    length: float
+    area: float
+    volume: float
+    tangent_start: Point
+    tangent_end: Point
+    normal: Point
+    bb_min: Point
+    bb_max: Point
+
+
+@runtime_checkable
+class BackendProtocol(Protocol[ShapeT]):
+    """What the measurement backend needs of a kernel: small functions, one for each step
+    OCCT takes. The core runs the sequence and makes the panel's rows. A plugin subclasses
+    it, so that a method it forgot fails when its object is created, and registers it."""
+
+    @abstractmethod
+    def deserialize(self, data: bytes) -> ShapeT:
+        """The shape of the bytes of `ShowProtocol.serialize` of ocp_tessellate, which wrote them
+        in the process that shows: `deserialize(serialize(x))` is x again. Raise on a format
+        version it cannot read: the two processes can have different versions of the plugin."""
+
+    @abstractmethod
+    def moved(self, shape: ShapeT, placement: Placement) -> ShapeT:
+        """The shape moved by a placement. Not called for a shape without one."""
+
+    @abstractmethod
+    def parts(self, shape: ShapeT) -> tuple[Sequence[ShapeT], Sequence[ShapeT], Sequence[ShapeT]]:
+        """Its faces, edges and vertices, in the order the mesh numbers them: the viewer
+        selects `{id}/faces/faces_{i}` and the backend answers for index i."""
+
+    @abstractmethod
+    def kind(self, shape: ShapeT) -> tuple[str, str]:
+        """What a shape is. Its type: `Vertex`, `Edge`, `Wire`, `Face`, `Shell`, `Solid`,
+        `CompSolid`, `Compound`. Its geometry: the names of `SURFACE_TYPES` and `CURVE_TYPES`,
+        `Point` for a vertex, `Other` for a body. Asked at every click of the distance tool, so
+        it must be cheap."""
+
+    @abstractmethod
+    def center(self, shape: ShapeT) -> Point | None:
+        """The point the distance tool's center mode measures from, None if the shape has none.
+        Asked at every such click, so it must not compute more than it needs."""
+
+    @abstractmethod
+    def properties(self, shape: ShapeT) -> ShapeProperties:
+        """What the kernel knows about a shape. See `ShapeProperties`."""
+
+    @abstractmethod
+    def closest_points(self, shape1: ShapeT, shape2: ShapeT) -> tuple[float, Point, Point]:
+        """The minimum distance of two shapes, and the points it is taken between."""
+
+    @abstractmethod
+    def closest_directions(self, shape1: ShapeT, shape2: ShapeT) -> tuple[Point, Point] | None:
+        """The tangent of an edge or the normal of a face at the closest points of two
+        edges or faces, None if there are no such directions."""
+
+
+PLUGINS: dict[str, BackendProtocol] = {}
+# the version of the plugin interface each of them stated
+PLUGIN_APIS: dict[str, int] = {}
+
+# The version of the plugin interface this ocp-viewer-core serves. A plugin states the one it
+# was written against, as a number of its own: a later version passes new arguments only to
+# plugins that state it, so an existing plugin keeps working.
+PLUGIN_API = 1
+
+
+def register_plugin(kernel: str, backend: BackendProtocol, *, api: int) -> None:
+    """Register a kernel's `BackendProtocol` under its tag. `api` is the version of the
+    plugin interface the plugin was written against, a number of its own."""
+    if not isinstance(backend, BackendProtocol):
+        raise TypeError(f"{type(backend).__name__} does not implement BackendProtocol")
+    if kernel == "" or kernel == "OCCT":
+        raise ValueError(f"'{kernel}' is no kernel tag of a plugin: 'OCCT' names OCCT's own shapes")
+    if type(api) is not int:
+        raise TypeError(f"Kernel plugin '{kernel}': api must be an int, not {api!r}")
+    if api < 1 or api > PLUGIN_API:
+        raise ValueError(
+            f"Kernel plugin '{kernel}' was written for plugin interface {api}, "
+            f"this ocp-viewer-core serves interface 1 to {PLUGIN_API}"
+        )
+    action = "re-registered" if kernel in PLUGINS else "registered"
+    PLUGINS[kernel] = backend
+    PLUGIN_APIS[kernel] = api
+    # flushed, as the backend's other lines are: a host may read its stdout through a pipe
+    print(f"Kernel plugin '{kernel}' {action} for measuring ({type(backend).__module__})", flush=True)
+
+
+def backend_of(kernel: str) -> BackendProtocol:
+    """The backend registered for a kernel, loading its entry point first if it is not.
+
+    LookupError when neither registered nor declared: the message names both ways and
+    what is registered.
     """
-    plugin = PLUGINS.get(kernel)
-    if plugin is not None:
-        return plugin
+    backend = PLUGINS.get(kernel)
+    if backend is not None:
+        return backend
     for entry_point in entry_points(group=ENTRY_POINT_GROUP):
         if entry_point.name == kernel:
-            # importing the plugin's module is what registers it
+            # importing the module it names is what registers the plugin
             entry_point.load()
             break
-    plugin = PLUGINS.get(kernel)
-    if plugin is None:
+    backend = PLUGINS.get(kernel)
+    if backend is None:
         raise LookupError(
             f"no measurement backend plugin for kernel '{kernel}': the plugin's package "
-            f"registers it with ocp_viewer_core.backend.register_plugin when imported, and "
-            f"declares an entry point '{kernel}' in the group '{ENTRY_POINT_GROUP}' so the "
-            f"backend process can import it"
+            f"registers it with ocp_viewer_core.backend.register_plugin in a module, and "
+            f"declares that module as an entry point '{kernel}' in the group '{ENTRY_POINT_GROUP}' "
+            f"so the backend process can import it. Registered: {sorted(PLUGINS)}"
         )
-    return plugin
+    return backend
 
 
 def is_kernel_shape(shape: Any) -> bool:
     """Whether a model entry's shape belongs to a kernel plugin: `{"kernel": tag, "obj": ...}`."""
     return isinstance(shape, dict) and "kernel" in shape
-
-
-def encode_kernel_shapes(mapping: dict[str, Any]) -> dict[str, Any]:
-    """The mapping with every kernel body replaced by base64 of its `serialize` bytes:
-    the pre-pass before the model goes to the backend. OCCT entries are untouched (the
-    codec writes them), and the mapping given is not changed."""
-
-    def walk(parts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        result = []
-        for part in parts:
-            if part.get("parts") is not None:
-                result.append({**part, "parts": walk(part["parts"])})
-                continue
-            shape = part["shape"]
-            if is_kernel_shape(shape):
-                data = plugin_of(shape["kernel"]).serialize(shape["obj"])
-                shape = {"kernel": shape["kernel"], "obj": base64.b64encode(data).decode("utf-8")}
-            result.append({**part, "shape": shape})
-        return result
-
-    return {**mapping, "parts": walk(mapping["parts"])}

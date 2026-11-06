@@ -43,6 +43,7 @@ from ocp_tessellate.convert import (
     tessellate_group,
     to_ocpgroup,
 )
+from ocp_tessellate.kernels import encode_kernel_shapes
 from ocp_tessellate.ocp_utils import (
     is_build123d,
     is_build123d_axis,
@@ -66,7 +67,6 @@ from .colors import BaseColorMap
 from .comms import Comms, H, is_pytest
 from .config import Camera, Collapse, Config, Render
 from .materials import vis_material_to_pbr
-from .plugins import encode_kernel_shapes
 from .utils import camera_keep_warning, camera_warning, ignore_camera_warnings
 
 # This module reaches OCP, through ocp_tessellate. That is why the package's
@@ -1242,6 +1242,11 @@ class Viewer(Generic[H]):
                 mapping,
             )  # pyright: ignore[reportReturnType]  # ty: ignore[invalid-return-type]
 
+        # The shapes of kernel plugins are serialized here, by their plugins; the codec writes
+        # the OCCT shapes. Before anything is sent: a plugin that fails makes the show fail as a
+        # whole, so the viewer and the backend stay on one scene.
+        model = encode_kernel_shapes(mapping)
+
         with Timer(timeit, "", "send"):
             handle = self.config.session.send_data(t, timeit=timeit)
 
@@ -1250,10 +1255,7 @@ class Viewer(Generic[H]):
         # widget it was just handed and another by a port; both keep whatever
         # they need inside their own Comms, where knowing about widgets or
         # ports is legitimate.
-        #
-        # The bodies of kernel plugins are serialized here, by their plugins
-        # (`plugins.py`); the codec writes the OCCT shapes.
-        self.comms.send_backend({"model": encode_kernel_shapes(mapping)}, timeit=timeit)
+        self.comms.send_backend({"model": model}, timeit=timeit)
         return handle
 
     def reset_show(self):

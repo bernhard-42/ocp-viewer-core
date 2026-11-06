@@ -11,6 +11,7 @@ from math import cos, pi, sin, sqrt
 
 import build123d as bd
 import pytest
+
 from ocp_viewer_core import measure
 from ocp_viewer_core.measure import calc_angle, get_distance, get_properties
 
@@ -41,14 +42,7 @@ def test_a_vertex_has_no_angle_row():
 
 
 def test_a_rounding_error_past_180_shows_no_negative_zero(monkeypatch):
-    real = measure.calc_angle
-
-    def past_180(shape1, shape2):
-        response = real(shape1, shape2)
-        response["angle"] = 180.0000000001
-        return response
-
-    monkeypatch.setattr(measure, "calc_angle", past_180)
+    monkeypatch.setattr(measure, "angle_between", lambda dir1, dir2: 180.0000000001 / 180 * pi)
     row = _angle_row(bd.Line((0, 0, 0), (10, 0, 0)), bd.Line((0, 0, 0), (0, 10, 0)))
     assert row == "180.000 (0.000)"
 
