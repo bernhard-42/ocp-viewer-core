@@ -7,7 +7,7 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 - Requires three-cad-viewer 5.2: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`)
 - `cursorPivot` and `zoomToCursor` reach the viewer at render and are applied on a live viewer through `setCursorPivot` and `setZoomToCursor`
 
-## Python v1.1.3 (unreleased)
+## Python v1.2.0 (unreleased)
 
 **Changes**
 
