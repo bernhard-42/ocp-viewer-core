@@ -43,7 +43,7 @@ from ocp_tessellate.convert import (
     tessellate_group,
     to_ocpgroup,
 )
-from ocp_tessellate.kernels import encode_kernel_shapes
+from ocp_tessellate.kernels import encode_kernel_shapes, is_external_object
 from ocp_tessellate.ocp_utils import (
     is_build123d,
     is_build123d_axis,
@@ -108,6 +108,8 @@ def is_drawable(obj):
         # By value: the keys become names in the viewer's tree, and a mapping of
         # shapes is an ordinary way to hold an assembly.
         return len(obj) > 0 and any(is_drawable(item) for item in obj.values())
+    if is_external_object(obj):
+        return True
     if hasattr(obj, "wrapped") and (
         is_topods_shape(obj.wrapped)
         or is_topods_compound(obj.wrapped)
@@ -1200,7 +1202,12 @@ class Viewer(Generic[H]):
                     if alphas[i] is not None:
                         colors[i].a = alphas[i]
 
-                if hasattr(cad_objs[i], "color") and cad_objs[i].color is not None:
+                # a kernel's container left to `to_ocp`: its color, if any, is the kernel's
+                if (
+                    hasattr(cad_objs[i], "color")
+                    and cad_objs[i].color is not None
+                    and not is_external_object(cad_objs[i])
+                ):
                     # ensure that the explicitly given color is kept
                     colors[i] = Color(cad_objs[i].color)
             else:
@@ -2003,7 +2010,8 @@ class Viewer(Generic[H]):
 
             if classes is None or isinstance(obj, tuple(classes)):
                 if (
-                    (
+                    is_external_object(obj)
+                    or (
                         hasattr(obj, "wrapped")
                         and (
                             is_topods_shape(obj.wrapped)
