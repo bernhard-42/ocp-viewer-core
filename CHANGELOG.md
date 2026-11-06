@@ -2,6 +2,11 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
+## JavaScript v1.2.0 (unreleased)
+
+- Requires three-cad-viewer 5.2: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`)
+- `cursorPivot` and `zoomToCursor` reach the viewer at render and are applied on a live viewer through `setCursorPivot` and `setZoomToCursor`
+
 ## Python v1.1.3 (unreleased)
 
 **Changes**
@@ -11,6 +16,7 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 **Features**
 
+- `cursor_pivot` and `zoom_to_cursor` as arguments of `show`, `show_object`, `show_objects`, `set_defaults` and `set_viewer_config` (`show_all` passes them on), for three-cad-viewer 5.2's rotation around and zoom towards the point under the cursor. Both are viewer state: they survive into the next show, and each host stores them in its workspace config
 - `show`, `show_object`, `show_objects`, `show_all` and visual debugging take objects of other kernels directly, atomic objects and the kernel's own containers, also beside OCCT objects, when their plugin registers with `ocp_tessellate.plugin.register_show`
 - Kernel plugins of the measurement backend (`ocp_viewer_core/plugins.py`): the distance and properties tools answer for objects of kernels other than OCCT from that kernel's own geometry. A plugin implements `BackendProtocol` (`deserialize`, `moved`, `parts`, `kind`, `center`, `properties`, `closest_points`, `closest_directions`), generic in its shape type as `BackendProtocol[Shape]`, registers it with `ocp_viewer_core.backend.register_plugin(kernel, backend, api=1)` when its module is imported, and declares that module as an entry point of the group `ocp_viewer.kernels.backend` named like the kernel, so the backend's process finds it (`backend_of`). `OcctBackend` implements the protocol for OCCT, so the backend treats every kernel alike: the core runs the sequence and makes the panel's rows from what `kind` and `properties` give (`ShapeProperties`, plain numbers), for OCCT and every plugin. A leaf that fails to load costs only that leaf, and a plugin's `serialize` (`ShowProtocol` of ocp-tessellate) runs before anything is sent, so the viewer and the backend stay on one scene. A distance between shapes of two kernels is one row saying so. [The backend protocol](https://bernhard-42.github.io/ocp_viewer_docs/plugins/backend/) describes the protocol
 

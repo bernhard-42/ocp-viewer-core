@@ -511,6 +511,8 @@ class Config:
         zoom_speed=None,
         pan_speed=None,
         rotate_speed=None,
+        cursor_pivot=None,
+        zoom_to_cursor=None,
         glass=None,
         tools=None,
         tree_width=None,
@@ -656,6 +658,8 @@ class Config:
         pan_speed=None,
         rotate_speed=None,
         zoom_speed=None,
+        cursor_pivot=None,
+        zoom_to_cursor=None,
         deviation=None,
         angular_tolerance=None,
         edge_accuracy=None,
@@ -775,6 +779,11 @@ class Config:
             pan_speed:          Speed of mouse panning (default=1)
             rotate_speed:       Speed of mouse rotate (default=1)
             zoom_speed:         Speed of mouse zoom (default=1)
+            cursor_pivot:       Rotate around the point under the cursor, or around the centre
+                                of the visible objects when the drag starts on the background;
+                                False rotates around the camera target (default=True)
+            zoom_to_cursor:     Zoom towards the cursor with the wheel and trackpad pinch;
+                                False zooms towards the centre of the view (default=True)
 
         - Renderer
             deviation:          Shapes: Deviation from linear deflection value (default=0.1)

@@ -116,6 +116,8 @@ const SETTERS = {
   zoomSpeed: (v, value, ctx) => call(v, "setZoomSpeed", [value], ctx.notify),
   panSpeed: (v, value, ctx) => call(v, "setPanSpeed", [value], ctx.notify),
   rotateSpeed: (v, value, ctx) => call(v, "setRotateSpeed", [value], ctx.notify),
+  cursorPivot: (v, value, ctx) => call(v, "setCursorPivot", [value], ctx.notify),
+  zoomToCursor: (v, value, ctx) => call(v, "setZoomToCursor", [value], ctx.notify),
 
   // "light", "dark", or "browser" to follow the surface. Applied on a live
   // viewer as well as at construction, which is what lets a host whose theme
@@ -259,6 +261,8 @@ const GETTERS = {
   zoomSpeed: (v) => v.getZoomSpeed(),
   panSpeed: (v) => v.getPanSpeed(),
   rotateSpeed: (v) => v.getRotateSpeed(),
+  cursorPivot: (v) => v.getCursorPivot(),
+  zoomToCursor: (v) => v.getZoomToCursor(),
 
   clipIntersection: (v) => v.getClipIntersection(),
   clipPlaneHelpers: (v) => v.getClipPlaneHelpers(),
