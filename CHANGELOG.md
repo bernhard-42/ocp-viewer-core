@@ -6,6 +6,7 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 - Requires three-cad-viewer 5.2: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`)
 - `cursorPivot` and `zoomToCursor` reach the viewer at render and are applied on a live viewer through `setCursorPivot` and `setZoomToCursor`
+- The page from `createPage` has `dispose()`, so a host can build a new page in the same container, for build123d Studio's "Restart viewer". It disposes the viewer, which frees the WebGL context and stops a running render loop, then the display, which removes its listeners (the document `keydown` behind Ctrl/Cmd-C among them) and empties the container, and it takes off the window `resize` and `message` listeners a page with `listen: true` added. A part that throws while disposing is logged, and the rest is still torn down. Afterwards every call on the page does nothing, so a late message cannot build a second viewer in the container; calling `dispose()` twice is harmless. Dispose the old page before creating the new one: three-cad-viewer's Display keeps its listeners in one manager shared by every Display of the bundle
 
 ## Python v1.2.0 (unreleased)
 

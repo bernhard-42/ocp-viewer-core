@@ -83,7 +83,7 @@ function consumeCoreVersion(config, send) {
  * @param listen      attach the window's `message` and `resize` listeners.
  *                    Default true; a host that has neither passes false and
  *                    drives `handleMessage` and `resize` itself
- * @returns `{ showSplash, setTheme, handleMessage, resize }` - the two page
+ * @returns `{ showSplash, setTheme, handleMessage, resize, dispose }` - the two page
  *          hosts deliver messages as a `message` event, the extension posting
  *          into the webview and the standalone's socket shim posting what came
  *          off the wire, and both let this file listen for them. A host whose
@@ -126,6 +126,13 @@ export function createPage({
     var notifier = null;
     var renderer = null;
     var status = {};
+
+    // Set by `dispose()`, and never cleared: a disposed page is not rebuilt in
+    // place. Every entry point checks it, because a message that arrives late
+    // - an IPC handler still holding this page object - would otherwise find
+    // `display == null`, take it for a page that never showed anything, and
+    // build a second Display in a container a new page may own by then.
+    var disposed = false;
 
     function debugLog(tag, obj) {
         console.log(tag, obj);
@@ -345,6 +352,9 @@ export function createPage({
      * function rather than a listener body.
      */
     function resize() {
+        if (disposed) {
+            return;
+        }
         // `ready` and not only null: clear() returns the viewer to its
         // never-rendered state, where resizeCadView throws - a splitter drag
         // over an emptied pane must not be an error. The next show measures
@@ -364,6 +374,9 @@ export function createPage({
     }
 
     function handleMessage(message) {
+        if (disposed) {
+            return;
+        }
         var data = message;
 
         // Before anything reads the config: take the Python half's version
@@ -522,27 +535,94 @@ export function createPage({
     // and calls `handleMessage` and `resize` itself. The dispatch above is the
     // same one either way, which is the point - a message branch is a feature,
     // and a host that wrote its own dispatch would have its own feature set.
+    //
+    // Named, so that `dispose()` can take them off again.
+    function onResize() {
+        resize();
+    }
+
+    function onMessage(event) {
+        handleMessage(
+            typeof event.data === "string" || event.data instanceof String
+                ? JSON.parse(event.data)
+                : event.data
+        );
+    }
+
     if (listen !== false) {
-        window.addEventListener("resize", () => resize(), true);
-        window.addEventListener("message", (event) => {
-            handleMessage(
-                typeof event.data === "string" || event.data instanceof String
-                    ? JSON.parse(event.data)
-                    : event.data
-            );
-        });
+        window.addEventListener("resize", onResize, true);
+        window.addEventListener("message", onMessage);
+    }
+
+    /**
+     * Tear the page down, so that the host can build a new one in the same
+     * container - build123d Studio's "Restart viewer", after an error has left
+     * three-cad-viewer unusable.
+     *
+     * The viewer before the display: `Viewer.dispose()` starts with `clear()`,
+     * which reaches into the display. Between them, the two free the WebGL
+     * context and the renderer, stop a running render loop (`clear()` empties
+     * its reasons), remove the display's listeners - the document `keydown`
+     * behind Ctrl/Cmd-C among them - and empty the container. A page that
+     * never showed anything has neither, and leaves the container as it was.
+     *
+     * Dispose the old page before creating the new one. three-cad-viewer's
+     * Display keeps its listeners in one manager shared by every Display of
+     * the bundle, so `display.dispose()` removes the new page's listeners too
+     * if that page already exists.
+     *
+     * Final: the page is not rebuilt in place, and every call on it afterwards
+     * does nothing. Calling `dispose()` twice is harmless. A half that throws
+     * while disposing is logged, and the rest is still torn down.
+     */
+    function dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        if (listen !== false) {
+            window.removeEventListener("resize", onResize, true);
+            window.removeEventListener("message", onMessage);
+        }
+        // Each half on its own, and said rather than thrown: a restart is
+        // what a host does when the viewer is already broken, so one that
+        // throws here must not keep the other half, or the reset below, from
+        // happening.
+        for (const [name, part] of [["viewer", viewer], ["display", display]]) {
+            if (part == null) {
+                continue;
+            }
+            try {
+                part.dispose();
+            } catch (error) {
+                const msg = `dispose: the ${name} failed to dispose: ${error}`;
+                console.error(msg);
+                send("log", msg);
+            }
+        }
+        viewer = null;
+        display = null;
+        notifier = null;
+        renderer = null;
+        status = {};
+        _shapes = null;
+        _meshData = null;
+        _config = null;
     }
 
     return {
         /** Draw the splash, with whatever the host knows that the core cannot. */
         showSplash(config) {
+            if (disposed) {
+                return;
+            }
             const splash = logo();
             showViewer(splash.data, { ...splash.config, ...config });
         },
 
         /** The host's theme changed under it - a VS Code colour theme, say. */
         setTheme(next) {
-            if (viewer != null) {
+            if (disposed === false && viewer != null) {
                 viewer.setTheme(next);
             }
         },
@@ -551,6 +631,9 @@ export function createPage({
         handleMessage,
 
         /** The surface changed size. What the resize listener above calls. */
-        resize
+        resize,
+
+        /** Tear the page down, for a new one in the same container. */
+        dispose
     };
 }
