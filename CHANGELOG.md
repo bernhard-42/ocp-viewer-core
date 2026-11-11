@@ -4,30 +4,49 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 ## JavaScript v1.2.0 (unreleased)
 
-- Requires three-cad-viewer 5.2: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`)
-- `cursorPivot` and `zoomToCursor` reach the viewer at render and are applied on a live viewer through `setCursorPivot` and `setZoomToCursor`
-- The select tool's clipboard text for three-cad-viewer 5.2.0, whose `selected` is grouped by object and kind (`{"<object path>/<kind>": [indices]}`) instead of a list of indices. The notifier sends the text beside `selected` as the event key `selectedText`, and `selectionText(selected)` is exported for a host with its own notification handler. One object and one kind give the indices as before, e.g. `6,16,7,17`, for `select_edges(obj, [...])` and its siblings, which are unchanged. Several objects or kinds give a comment line `# <object path> <kind>` before each one's indices, where a single list used to mix them and select the wrong shapes; a whole solid gives its comment line only. The empty selection, sent when the select tool goes off or on Escape, gives no text, so the clipboard is kept. Hosts copy `selectedText` instead of `selected.join(",")`, which throws or copies nothing on the new format
-- The JavaScript side of the agent tools, ahead of their Python side, so that those can follow as a Python release alone (they ride on the config and screenshot messages every host already relays):
-  - `shapeFilter` as a config key (three-cad-viewer's `setShapeFilter`), readable with `currentValue`. Its notification `shape_filter` is state in the page's status
-  - Three action keys, listed in the exported `ACTION_KEYS`: `agentHighlight` (paths to mark, `[]` clears), `selection` (paths made the user's selection; needs the select tool, so a config block switches `analysisTool` first) and `clearSelection`. `applyConfig` takes `onResult` for the paths they could not find and `onError` for a refusal, which no longer stops the rest of the block. The page records each config block's actions in its status as `last_action: {seq, unknown_paths, error}` and sends the status, also when it refuses them because no model is on screen. Actions are not kept with the show's settings
-  - A screenshot message with `view` (and optionally `ortho`, `clip`) captures with a camera of its own (`captureView`) instead of the user's: the answer is the same `screenshot` message, so hosts write the file as before, and it also carries the camera and `displaced` for a host that reads the reply itself. Both go into the status as `last_capture` too, as does an error, for which no reply is sent and no file is written
-  - `selected` and `lastPick` are kept in the status, so `status()` tells the current selection and the last pick; they are no event keys any more. `selection_seq` and `pick_seq` count every selection and pick. A new model drops `lastPick`; three-cad-viewer itself reports the empty selection for it
-- The page from `createPage` has `dispose()`, so a host can build a new page in the same container, for build123d Studio's "Restart viewer". It disposes the viewer, which frees the WebGL context and stops a running render loop, then the display, which removes its listeners (the document `keydown` behind Ctrl/Cmd-C among them) and empties the container, and it takes off the window `resize` and `message` listeners a page with `listen: true` added. A part that throws while disposing is logged, and the rest is still torn down. Afterwards every call on the page does nothing, so a late message cannot build a second viewer in the container; calling `dispose()` twice is harmless. Dispose the old page before creating the new one: three-cad-viewer's Display keeps its listeners in one manager shared by every Display of the bundle
+**three-cad-viewer 5.2**
+
+- **Requires three-cad-viewer 5.2**: the peer range is `>=5.2.0 <5.3.0` (was `>=5.1.0 <5.2.0`).
+- **Rotate around and zoom towards the cursor**: the settings `cursorPivot` and `zoomToCursor` reach the viewer when a model is shown, and can be changed on a live viewer.
+- **Shape filter as a setting**: `shapeFilter` (`none`, `vertex`, `edge`, `face`, `solid`) can be set on a live viewer; its current value is reported as `shape_filter`.
+
+**Copying a selection**
+
+- **Clipboard text for the new selection format**: three-cad-viewer 5.2 groups the select tool's selection by object and kind. For one object and one kind the clipboard holds the indices as before, e.g. `6,16,7,17`. For several objects or kinds it holds one labelled line per object and kind, `# <object path> <kind>` followed by its indices, where it used to mix them into one list that selected the wrong shapes. An empty selection leaves the clipboard as it is.
+- **For hosts**: the text arrives beside `selected` as `selectedText`; a host with its own notification handler calls `selectionText(selected)`. `selected.join(",")` no longer works with three-cad-viewer 5.2.
+
+**Selection and last pick in the status**
+
+- **`status()` reports the current selection and the last double-click pick** (`selected`, `lastPick`), each with a counter (`selection_seq`, `pick_seq`) that moves with every new one. A new model clears the last pick. This holds where the viewer runs the core's page: VS Code, the standalone viewer and build123d Studio; Jupyter's widget reports `lastPick` through its own trait.
+
+**Restarting the viewer**
+
+- **`dispose()` on the page**: a host can tear the viewer down and build a new one in the same container, e.g. for build123d Studio's "Restart viewer". It frees the WebGL context and removes the viewer's listeners. Dispose the old page before creating the new one.
+
+**For future agent tools**
+
+- **Marks, selection and capture**: the settings `agentHighlight`, `selection` and `clearSelection`, and a screenshot request with `view` (plus `ortho`, `clip`) that renders a preset view without moving the user's camera. Their outcome is reported in the status as `last_action` and `last_capture`; a capture's reply also carries the camera and whether parts are displaced. `applyConfig` takes `onResult` and `onError` for them, and a refused one no longer stops the rest of the settings.
 
 ## Python v1.2.0 (unreleased)
 
+**Objects of other CAD kernels**
+
+- **Show objects of other kernels**: `show`, `show_object`, `show_objects`, `show_all` and visual debugging take objects of kernels other than OCCT, alone or mixed with build123d, CadQuery and OCCT objects, when the kernel's plugin is installed. The first plugin is [ocp-viewer-smlibpy](https://github.com/bernhard-42/ocp-viewer-smlibpy) for SMLib.
+- **Measure objects of other kernels**: the distance and properties tools answer from the kernel's own geometry, through a plugin of the measurement backend ([the backend protocol](https://bernhard-42.github.io/ocp_viewer_docs/plugins/backend/)). A distance between shapes of two kernels is one row saying so.
+- **Requires ocp-tessellate 3.7** (`>=3.7.0,<3.8.0`, was `>=3.6.2,<3.7.0`), which brings the plugin system. Nothing changes for OCCT objects.
+
+**New viewer settings**
+
+- **`cursor_pivot` and `zoom_to_cursor`**: rotate around and zoom towards the point under the cursor, on by default. Arguments of `show`, `show_object`, `show_objects`, `set_defaults` and `set_viewer_config`; they carry over from show to show, and each viewer stores them in its settings.
+- **`set_viewer_config(shape_filter=...)`**: which kind a pick and a select-tool click take, `"none"` (all), `"vertex"`, `"edge"`, `"face"` or `"solid"`, as the viewer's dropdown and the keys a/v/e/f/s set it. Only on a live viewer: every new model resets it to `"none"`.
+
 **Changes**
 
-- Requires `ocp-tessellate>=3.7.0,<3.8.0` (was `>=3.6.2,<3.7.0`), which brings `ocp_tessellate.plugin`: objects of kernels other than OCCT go through the show pipeline as `OcpObject`s holding the kernel's shape, and every leaf gets an entry in the measurement backend's model (see Features). The first plugin is [ocp-viewer-smlibpy](https://github.com/bernhard-42/ocp-viewer-smlibpy) for SMLib. Nothing changes for OCCT objects, and the viewers need no code change
-- `show` raises a `TypeError` for an object passed directly that nothing can draw, which used to draw nothing without a word: `show cannot draw an object of type my_module.Foo; if it belongs to another kernel, is its plugin installed?`. Inside a list, tuple or dict it is still left out, `show_all` still leaves it out of a scope, and numbers and strings stay silent. It comes with ocp-tessellate 3.7
+- **`show` raises for an object it cannot draw**: a `TypeError` ("... if it belongs to another kernel, is its plugin installed?") instead of drawing nothing. Inside lists, tuples and dicts, and in `show_all`, such objects are still skipped, and numbers and strings stay silent.
 
-**Features**
+**For future agent tools**
 
-- `cursor_pivot` and `zoom_to_cursor` as arguments of `show`, `show_object`, `show_objects`, `set_defaults` and `set_viewer_config` (`show_all` passes them on), for three-cad-viewer 5.2's rotation around and zoom towards the point under the cursor. Both are viewer state: they survive into the next show, and each host stores them in its workspace config
-- `show`, `show_object`, `show_objects`, `show_all` and visual debugging take objects of other kernels directly, atomic objects and the kernel's own containers, also beside OCCT objects, when their plugin registers with `ocp_tessellate.plugin.register_show`
-- Kernel plugins of the measurement backend (`ocp_viewer_core/plugins.py`): the distance and properties tools answer for objects of kernels other than OCCT from that kernel's own geometry. A plugin implements `BackendProtocol` (`deserialize`, `moved`, `parts`, `kind`, `center`, `properties`, `closest_points`, `closest_directions`), generic in its shape type as `BackendProtocol[Shape]`, registers it with `ocp_viewer_core.backend.register_plugin(kernel, backend, api=1)` when its module is imported, and declares that module as an entry point of the group `ocp_viewer.kernels.backend` named like the kernel, so the backend's process finds it (`backend_of`). `OcctBackend` implements the protocol for OCCT, so the backend treats every kernel alike: the core runs the sequence and makes the panel's rows from what `kind` and `properties` give (`ShapeProperties`, plain numbers), for OCCT and every plugin. A leaf that fails to load costs only that leaf, and a plugin's `serialize` (`ShowProtocol` of ocp-tessellate) runs before anything is sent, so the viewer and the backend stay on one scene. A distance between shapes of two kernels is one row saying so. [The backend protocol](https://bernhard-42.github.io/ocp_viewer_docs/plugins/backend/) describes the protocol
-- `set_viewer_config(shape_filter=...)`: which kind a pick and a select-tool click take, `"none"` (all), `"vertex"`, `"edge"`, `"face"` or `"solid"`, as three-cad-viewer 5.2's dropdown and the keys a/v/e/f/s set it. Not a show option: three-cad-viewer resets the filter to `"none"` for every new model, so it is not carried into the next show either
-- Private, for the agent tools of build123d Studio: `Viewer._agent_highlight(paths)`, `_agent_select(paths)`, `_agent_clear_selection()` and `_agent_capture(filename, view, ortho, clip)`, with the config keys `agent_highlight`, `selection` and `clear_selection` (`keys.AGENT`). They send what the JavaScript half of 1.2.0 understands, so that the tools built on them can follow as Python patches. `save_screenshot` is unchanged
+- **Private methods** `Viewer._agent_highlight`, `_agent_select`, `_agent_clear_selection` and `_agent_capture`, not meant for users: they send the agent's marks, selection and captures, so that the agent tools can follow as patch releases. `save_screenshot` is unchanged.
 
 ## Python v1.1.2 (2026-10-13)
 
