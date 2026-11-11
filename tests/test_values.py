@@ -62,6 +62,7 @@ PLAIN_KEYS = {
     "up": ("Z", "Y"),
     "zebra_color_scheme": ("blackwhite", "colorful", "grayscale"),
     "zebra_mapping_mode": ("reflection", "normal"),
+    "shape_filter": ("none", "vertex", "edge", "face", "solid"),
 }
 
 

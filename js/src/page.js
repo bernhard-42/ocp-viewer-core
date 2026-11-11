@@ -30,7 +30,7 @@
 */
 
 import { animate } from "./animation.js";
-import { applyConfig } from "./apply.js";
+import { ACTION_KEYS, applyConfig } from "./apply.js";
 import { logo } from "./logo.js";
 import { createNotifier } from "./notify.js";
 import { buildDisplayOptions, preset } from "./options.js";
@@ -373,6 +373,26 @@ export function createPage({
         }
     }
 
+    /**
+     * Record that a config block's actions (ACTION_KEYS) were not applied at
+     * all, so whoever sent them reads that with `status()` instead of waiting
+     * for an outcome that never comes. A block without actions is untouched.
+     */
+    function refuseActions(config, reason) {
+        const actions = Object.keys(config).filter((key) =>
+            ACTION_KEYS.includes(key)
+        );
+        if (actions.length === 0) {
+            return;
+        }
+        status.last_action = {
+            seq: (status.last_action?.seq ?? 0) + 1,
+            unknown_paths: {},
+            error: { key: actions[0], message: reason }
+        };
+        send("status", { ...status });
+    }
+
     function handleMessage(message) {
         if (disposed) {
             return;
@@ -412,6 +432,12 @@ export function createPage({
                 // debugLog("logo zoom =", config.zoom);
             }
 
+            // A pick belongs to the model it was made on. three-cad-viewer
+            // reports the empty selection for a new model itself, but has no
+            // such reset for the last pick, so it is dropped here, before the
+            // render's notifications send the status on.
+            delete status.lastPick;
+
             showViewer(meshData, config);
 
             // Explicit states win, otherwise the user's prior visibility
@@ -422,6 +448,40 @@ export function createPage({
             timer.split("states updated");
 
             timer.stop();
+        } else if (data.type === "screenshot" && data.view !== undefined) {
+            // A capture from a camera of its own (three-cad-viewer 5.2), for
+            // the agent: answered like a screenshot, so every host writes the
+            // file as it does for one. The reply also carries what the image
+            // alone does not say - the camera and whether parts are displaced -
+            // for a host that reads the reply itself (Studio's sidecar gets it
+            // in Python); hosts that only write the file read `filename` and
+            // `data` and ignore the rest. The same goes into the status, and so
+            // does a failure, which gets no reply: a reply without `data` would
+            // reach the hosts' file writers.
+            viewer
+                .captureView({ view: data.view, ortho: data.ortho, clip: data.clip })
+                .then((result) => {
+                    status.last_capture = {
+                        filename: data.filename,
+                        camera: result.camera,
+                        displaced: result.displaced
+                    };
+                    send("screenshot", {
+                        filename: data.filename,
+                        data: result.dataUrl,
+                        camera: result.camera,
+                        displaced: result.displaced
+                    });
+                    send("status", { ...status });
+                })
+                .catch((error) => {
+                    status.last_capture = {
+                        filename: data.filename,
+                        error: String(error)
+                    };
+                    debugLog(`screenshot: capture failed: ${error}`);
+                    send("status", { ...status });
+                });
         } else if (data.type === "screenshot") {
             var promise = viewer.getImage(data.filename);
             promise.then((result) => {
@@ -470,14 +530,28 @@ export function createPage({
             // the hardest thing to debug.
             if (viewer == null || viewer.ready !== true) {
                 debugLog("ui: no model on screen, config not applied");
+                refuseActions(data.config, "no model on screen");
                 return;
             }
             if (_config["_splash"]) {
+                refuseActions(data.config, "the logo is on screen");
                 return;
             }
             if (data.config.debug) {
                 debugLog("data.config", data.config);
             }
+            // The agent's actions (ACTION_KEYS) answer through the status: one
+            // record per config block, numbered, with the paths each one could
+            // not find and the error of one the viewer refused, so whoever sent
+            // the block reads its outcome with `status()`.
+            const actions = Object.keys(data.config).filter((key) =>
+                ACTION_KEYS.includes(key)
+            );
+            const lastAction = {
+                seq: (status.last_action?.seq ?? 0) + 1,
+                unknown_paths: {},
+                error: null
+            };
             // One dispatch for every key, shared with every other host, so
             // that a setter cannot exist in one client and not another.
             const applied = applyConfig(viewer, data.config, {
@@ -498,16 +572,30 @@ export function createPage({
                 },
                 onUnknown: (key) => {
                     debugLog(`ui: no setter for '${key}'`);
+                },
+                onResult: (key, unknown) => {
+                    lastAction.unknown_paths[key] = unknown;
+                },
+                onError: (key, error) => {
+                    lastAction.error = { key: key, message: String(error.message) };
+                    debugLog(`ui: '${key}' not applied: ${error.message}`);
                 }
             });
+            if (actions.length > 0) {
+                status.last_action = lastAction;
+                send("status", { ...status });
+            }
             // The viewer changed; _config follows, for exactly the applied
             // keys. Without this the two disagree, and resize() - a window
             // resize, a splitter drag, Studio's pane observer on every Run -
             // re-derives geometry from the value the ui call just replaced:
             // set_viewer_config(glass=False) held until the next resize
             // snapped glass back on. Same family: tools, treeWidth, theme.
+            // Actions are not settings, so they stay out of it.
             for (const key of applied) {
-                _config[key] = data.config[key];
+                if (ACTION_KEYS.includes(key) === false) {
+                    _config[key] = data.config[key];
+                }
             }
             // Glass and tools decide whether the tree sits over the canvas or
             // beside it, and three-cad-viewer re-lays out with the `cadWidth`

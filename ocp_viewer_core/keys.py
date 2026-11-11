@@ -23,6 +23,7 @@ rather than any host, so they belong with neither.
 #
 
 __all__ = [
+    "AGENT",
     "ALL",
     "CAMERA",
     "CONFIG",
@@ -81,6 +82,9 @@ UI_TOOLBAR = {
     "explode": None,  # applied by code (setExplode)
     "analysis_tool": None,  # tool activation, not an option
     "tab": "tab",
+    # three-cad-viewer 5.2: which kind a pick and a select-tool click take.
+    # Settable on a live viewer only; see NOT_CONFIG for why it is no show key.
+    "shape_filter": "shapeFilter",
 }
 
 UI_TREE = {
@@ -206,6 +210,18 @@ CAMERA = {
     "zoom": "zoom",
 }
 
+# The agent's actions on a live viewer (three-cad-viewer 5.2, the page's
+# ACTION_KEYS): marks by path, a selection by path, clearing the user's
+# selection. Named here so that the wire is complete in Python 1.2.0 and the
+# agent tools can follow as patches. Sent only by `Viewer`'s underscore methods,
+# never by user API: no parameter of `set_viewer_config` (not in SETTABLE) and
+# no configuration (in NOT_CONFIG).
+AGENT = {
+    "agent_highlight": "agentHighlight",
+    "selection": "selection",
+    "clear_selection": "clearSelection",
+}
+
 ALL = merge(
     UI,
     DISPLAY,
@@ -214,6 +230,7 @@ ALL = merge(
     RENDERER,
     CONTROL,
     CAMERA,
+    AGENT,
 )
 
 # The keys of a viewer's own state that are configuration, and so survive into
@@ -230,7 +247,7 @@ ALL = merge(
 # can answer; it answers it with values, in `Comms.workspace_config`, and needs
 # no key list here.
 #
-# The four exclusions, each because the key is not viewer state that survives:
+# The exclusions, each because the key is not viewer state that survives:
 #   CONTROL  - per-show instructions (timeit, render_normals, reset_camera).
 #              A viewer never reports them back; they are said once, per call.
 #   CAMERA   - position/quaternion/target/zoom are the camera *now*, carried by
@@ -244,14 +261,20 @@ ALL = merge(
 #              for that call alone. The widget host's status echoes its own
 #              traits - Python's last-sent value - and keeping the echo made
 #              `show(orbit_control=True)` stick to every following show there.
+#   shape_filter - viewer state, reported in the page's status, but three-cad-
+#              viewer resets it to "none" for every new model; carried into
+#              the next show, a stale filter would be put back over that reset.
+#   AGENT    - actions, not state.
 NOT_CONFIG = (
     *CONTROL,
     *CAMERA,
+    *AGENT,
     "cad_width",
     "height",
     "edge_accuracy",
     "orbit_control",
     "up",
+    "shape_filter",
 )
 
 CONFIG = {key: value for key, value in ALL.items() if key not in NOT_CONFIG}

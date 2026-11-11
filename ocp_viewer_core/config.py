@@ -175,6 +175,10 @@ ALLOWED_VALUES = {
     "up": ("Z", "Y"),
     "zebra_color_scheme": ("blackwhite", "colorful", "grayscale"),
     "zebra_mapping_mode": ("reflection", "normal"),
+    # three-cad-viewer 5.2's shape filter. Strings rather than an enum, like
+    # `theme`: a new enum would need every host to re-export it, while
+    # `set_viewer_config` reaches the users of all of them as it is.
+    "shape_filter": ("none", "vertex", "edge", "face", "solid"),
 }
 
 # `studio_environment` is deliberately absent: it takes a StudioEnvironment
@@ -555,6 +559,10 @@ class Config:
         studio_texture_mapping=None,
         studio_4k_env_maps=None,
         analysis_tool=None,
+        # Which kind a pick and a select-tool click take: "none" (all),
+        # "vertex", "edge", "face" or "solid". Here only, no show option:
+        # three-cad-viewer resets it to "none" for every new model.
+        shape_filter=None,
         # Host keywords, as on `show`: which viewer this is addressed to. Every
         # client accepts them and each acts on the ones it owns.
         port=None,

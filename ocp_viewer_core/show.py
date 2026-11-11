@@ -246,6 +246,11 @@ class ShowProgress(Progress):
         return self.levels == ""
 
 
+# The preset views three-cad-viewer's `captureView` takes, checked before a
+# capture is asked for so that a typo raises here instead of ending in a poll
+# timeout.
+_CAPTURE_VIEWS = ("iso", "front", "rear", "left", "right", "top", "bottom")
+
 _MODE_STATES = {
     Render.ALL: (1, 1),
     Render.EDGES: (0, 1),
@@ -2132,6 +2137,15 @@ class Viewer(Generic[H]):
             timeout_s:      While polling, how many seconds to wait for the file before
                             giving up with a warning; fractions are allowed (default=2)
         """
+        self._screenshot(filename, {}, port, polling, progress_only, timeout_s)
+
+    def _screenshot(self, filename, extra, port, polling, progress_only, timeout_s):
+        """Ask the viewer for an image and wait for the file the host writes.
+
+        The one path for `save_screenshot` and the agent's `_agent_capture`:
+        `extra` is what goes into the screenshot command beside its type and
+        file name - nothing for a screenshot, the view for a capture.
+        """
         if not filename.startswith(os.sep):
             prefix = pathlib.Path(".").absolute()
             full_path = str(prefix / filename)
@@ -2142,7 +2156,9 @@ class Viewer(Generic[H]):
 
         self.config.session.begin({"port": port})
         try:
-            self.comms.send_command({"type": "screenshot", "filename": f"{full_path}"})
+            self.comms.send_command(
+                {"type": "screenshot", "filename": f"{full_path}", **extra}
+            )
         finally:
             self.config.session.clear()
 
@@ -2161,3 +2177,64 @@ class Viewer(Generic[H]):
                     print(f"Warning: Screenshot not found in {timeout_s} seconds, aborting")
                     break
                 time.sleep(0.1)
+
+    # ======================== the agent's wire ======================== #
+    #
+    # Private, for the agent tools only (agent mode exists only in build123d
+    # Studio). They send what the JavaScript half of 1.2.0 already understands -
+    # the page's ACTION_KEYS and a screenshot with a view - so that the tools
+    # built on them can follow as Python patches (`plans/python-wire-1.2.md`).
+    # Each sends one config block through the same path as `set_viewer_config`;
+    # the page answers in its status, `last_action` (seq, unknown_paths, error)
+    # and `last_capture`.
+
+    def _send_agent_config(self, config, port):
+        self.config.session.begin({"port": port})
+        try:
+            self.config._send_viewer_config(config)
+        finally:
+            self.config.session.clear()
+
+    def _agent_highlight(self, paths, port=None):
+        """Mark components or whole solids by path for the agent; `[]` clears."""
+        self._send_agent_config({"agent_highlight": list(paths)}, port)
+
+    def _agent_select(self, paths, port=None):
+        """Make the paths the user's selection.
+
+        Needs the select tool on, and does not switch it on: the caller restores
+        the view, tool included, first (decision 23 of the requirements).
+        """
+        self._send_agent_config({"selection": list(paths)}, port)
+
+    def _agent_clear_selection(self, port=None):
+        """Clear the user's selection; the agent's marks stay."""
+        self._send_agent_config({"clear_selection": True}, port)
+
+    def _agent_capture(
+        self,
+        filename,
+        view,
+        ortho=None,
+        clip=False,
+        port=None,
+        polling=True,
+        timeout_s=2,
+    ):
+        """Capture a preset view with a camera of its own, into `filename`.
+
+        The user's camera stays as it is. `ortho` None keeps the user's
+        projection; `clip` False shows the model unclipped. The camera used and
+        whether parts are displaced come back in the screenshot reply and in the
+        status as `last_capture`. `save_screenshot` deliberately has no view
+        (decision 15 of the requirements).
+        """
+        if view not in _CAPTURE_VIEWS:
+            raise ValueError(
+                f"view={view!r} is not valid. Use one of "
+                f"{', '.join(repr(v) for v in _CAPTURE_VIEWS)}"
+            )
+        extra = {"view": view, "clip": clip}
+        if ortho is not None:
+            extra["ortho"] = ortho
+        self._screenshot(filename, extra, port, polling, False, timeout_s)
