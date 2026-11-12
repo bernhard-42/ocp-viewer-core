@@ -1248,19 +1248,20 @@ class Viewer(Generic[H]):
             else:
                 self.last_call = "other"
 
-        if not progress.none:
-            print()
-
-        # Only objects nothing can draw, which ocp-tessellate leaves out: the
-        # same case as no objects at all above, found after converting, and
-        # answered the same way - nothing is sent, so the viewer keeps what it
-        # shows. The
-        # count is the message's under a viewer and the tuple's fourth entry
-        # under the test stub (see `_convert`).
+        # Only objects nothing can draw, which ocp-tessellate leaves out and
+        # names: the same case as no objects at all above, found after
+        # converting, and answered the same way - nothing is sent, so the viewer
+        # keeps what it shows. Before the progress line is ended, because
+        # nothing was tessellated and there is no progress line. The count is
+        # the message's under a viewer and the tuple's fourth entry under the
+        # test stub (see `_convert`).
         count = t[3] if is_pytest() else t["count"]
         if count == 0:
             print("show: No CAD objects to show")
             return None
+
+        if not progress.none:
+            print()
 
         if is_pytest():
             # The one place the `H | None` annotation is not the truth: under

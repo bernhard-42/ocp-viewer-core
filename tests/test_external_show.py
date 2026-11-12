@@ -218,6 +218,9 @@ class NotDrawable:
     """No kernel owns it, and no plugin."""
 
 
+SKIPPED = "show: skipped test_external_show.NotDrawable (no kernel plugin installed?)"
+
+
 @pytest.mark.parametrize(
     "objects",
     [lambda: (NotDrawable(),), lambda: ([NotDrawable()],)],
@@ -225,11 +228,11 @@ class NotDrawable:
 )
 def test_show_with_nothing_it_can_draw_says_so(viewer, capsys, objects):
     """Nothing is left to draw, so nothing is sent: the viewer keeps what it shows. The
-    object itself is left out quietly, passed directly as in a list."""
+    object is named once, passed directly as in a list."""
     assert viewer.show(*objects()) is None
     out = capsys.readouterr().out
+    assert out.count(SKIPPED) == 1
     assert "show: No CAD objects to show" in out
-    assert "cannot draw" not in out
     assert viewer.comms.sent == []
 
 
@@ -241,7 +244,7 @@ def test_show_with_nothing_it_can_draw_says_so(viewer, capsys, objects):
 def test_show_draws_what_it_can_beside_an_object_nothing_can_draw(viewer, capsys, objects):
     viewer.show(*objects())
     out = capsys.readouterr().out
-    assert "cannot draw" not in out
+    assert out.count(SKIPPED) == 1
     assert "No CAD objects to show" not in out
     assert len(viewer.comms.sent[-1]["data"]["shapes"]["parts"]) == 1
 
@@ -253,15 +256,17 @@ def test_show_without_objects_says_so(viewer, capsys):
     assert viewer.comms.sent == []
 
 
-def test_show_all_leaves_it_out_of_a_scope(viewer):
+def test_show_all_leaves_it_out_of_a_scope(viewer, capsys):
+    """A scope is full of things that are not CAD objects: no line for them."""
     viewer.show_all({"point": ToyPoint(), "other": NotDrawable()})
+    assert "show: skipped" not in capsys.readouterr().out
     assert [p["name"] for p in viewer.comms.sent[-1]["data"]["shapes"]["parts"]] == ["point"]
 
 
-def test_show_all_draws_the_rest_when_it_is_named_by_include(viewer, capsys):
-    """Named by include, it is passed to show directly, and left out like any other."""
+def test_show_all_names_it_when_it_is_named_by_include(viewer, capsys):
+    """Named by include, it is passed to show directly, and named like any other."""
     viewer.show_all({"point": ToyPoint(), "other": NotDrawable()}, classes=[ToyPoint], include=["other"])
-    assert "cannot draw" not in capsys.readouterr().out
+    assert capsys.readouterr().out.count(SKIPPED) == 1
     assert [p["name"] for p in viewer.comms.sent[-1]["data"]["shapes"]["parts"]] == ["point"]
 
 

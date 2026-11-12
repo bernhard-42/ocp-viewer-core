@@ -42,7 +42,8 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 **Changes**
 
-- **A `show` with nothing it can draw says so**: when every object passed is one nothing can draw - e.g. an object of another kernel whose plugin is not installed - `show` prints `show: No CAD objects to show`, as a `show()` without objects does, and sends nothing, so the viewer keeps what it shows. Objects nothing can draw are left out quietly, passed directly as in a list, and the others are drawn.
+- **Objects `show` cannot draw are named**: an object nothing can draw - e.g. an object of another kernel whose plugin is not installed - is left out, passed directly or inside a list, and the others are drawn; ocp-tessellate 3.7 names each such type once per show, e.g. `show: skipped smlibpy.shapes.Part (no kernel plugin installed?)`. Builtin types such as `None` stay silent, and `show_all` names none of the variables in a scope it leaves out.
+- **A `show` with nothing it can draw says so**: when nothing is left to draw, `show` prints `show: No CAD objects to show`, as a `show()` without objects does, and sends nothing, so the viewer keeps what it shows.
 
 **For future agent tools**
 
