@@ -218,9 +218,38 @@ class NotDrawable:
     """No kernel owns it, and no plugin."""
 
 
-def test_show_raises_for_an_object_nothing_can_draw(viewer):
-    with pytest.raises(TypeError, match="show cannot draw an object of type .*NotDrawable"):
-        viewer.show(NotDrawable())
+@pytest.mark.parametrize(
+    "objects",
+    [lambda: (NotDrawable(),), lambda: ([NotDrawable()],)],
+    ids=["directly", "in a list"],
+)
+def test_show_with_nothing_it_can_draw_says_so(viewer, capsys, objects):
+    """Nothing is left to draw, so nothing is sent: the viewer keeps what it shows. The
+    object itself is left out quietly, passed directly as in a list."""
+    assert viewer.show(*objects()) is None
+    out = capsys.readouterr().out
+    assert "show: No CAD objects to show" in out
+    assert "cannot draw" not in out
+    assert viewer.comms.sent == []
+
+
+@pytest.mark.parametrize(
+    "objects",
+    [lambda: (ToyPoint(), NotDrawable()), lambda: ([ToyPoint(), NotDrawable()],)],
+    ids=["directly", "in a list"],
+)
+def test_show_draws_what_it_can_beside_an_object_nothing_can_draw(viewer, capsys, objects):
+    viewer.show(*objects())
+    out = capsys.readouterr().out
+    assert "cannot draw" not in out
+    assert "No CAD objects to show" not in out
+    assert len(viewer.comms.sent[-1]["data"]["shapes"]["parts"]) == 1
+
+
+def test_show_without_objects_says_so(viewer, capsys):
+    """The same message as for objects nothing can draw."""
+    assert viewer.show() is None
+    assert "show: No CAD objects to show" in capsys.readouterr().out
     assert viewer.comms.sent == []
 
 
@@ -229,11 +258,11 @@ def test_show_all_leaves_it_out_of_a_scope(viewer):
     assert [p["name"] for p in viewer.comms.sent[-1]["data"]["shapes"]["parts"]] == ["point"]
 
 
-def test_show_all_says_so_when_it_is_named_by_include(viewer, capsys):
-    """It was asked for by name, so it is not left out quietly."""
+def test_show_all_draws_the_rest_when_it_is_named_by_include(viewer, capsys):
+    """Named by include, it is passed to show directly, and left out like any other."""
     viewer.show_all({"point": ToyPoint(), "other": NotDrawable()}, classes=[ToyPoint], include=["other"])
-    assert "show cannot draw an object of type" in capsys.readouterr().out
-    assert viewer.comms.sent == []
+    assert "cannot draw" not in capsys.readouterr().out
+    assert [p["name"] for p in viewer.comms.sent[-1]["data"]["shapes"]["parts"]] == ["point"]
 
 
 def test_a_kernel_objects_own_color_is_left_to_its_plugin(viewer):

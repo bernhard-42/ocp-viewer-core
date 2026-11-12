@@ -42,7 +42,7 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 **Changes**
 
-- **`show` raises for an object it cannot draw**: a `TypeError` ("... if it belongs to another kernel, is its plugin installed?") instead of drawing nothing. Inside lists, tuples and dicts, and in `show_all`, such objects are still skipped, and numbers and strings stay silent.
+- **A `show` with nothing it can draw says so**: when every object passed is one nothing can draw - e.g. an object of another kernel whose plugin is not installed - `show` prints `show: No CAD objects to show`, as a `show()` without objects does, and sends nothing, so the viewer keeps what it shows. Objects nothing can draw are left out quietly, passed directly as in a list, and the others are drawn.
 
 **For future agent tools**
 

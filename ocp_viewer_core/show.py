@@ -1251,6 +1251,17 @@ class Viewer(Generic[H]):
         if not progress.none:
             print()
 
+        # Only objects nothing can draw, which ocp-tessellate leaves out: the
+        # same case as no objects at all above, found after converting, and
+        # answered the same way - nothing is sent, so the viewer keeps what it
+        # shows. The
+        # count is the message's under a viewer and the tuple's fourth entry
+        # under the test stub (see `_convert`).
+        count = t[3] if is_pytest() else t["count"]
+        if count == 0:
+            print("show: No CAD objects to show")
+            return None
+
         if is_pytest():
             # The one place the `H | None` annotation is not the truth: under
             # the test stub `_convert` returns the tessellation rather than a
