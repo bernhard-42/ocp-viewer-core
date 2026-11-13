@@ -32,6 +32,10 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 - **Marks, selection and capture**: the settings `agentHighlight`, `selection` and `clearSelection`, and a screenshot request with `view` (plus `ortho`, `clip`) that renders a preset view without moving the user's camera. Their outcome is reported in the status as `last_action` and `last_capture`; a capture's reply also carries the camera and whether parts are displaced. `applyConfig` takes `onResult` and `onError` for them, and a refused one no longer stops the rest of the settings.
 
+**Packaging**
+
+- **The npm package contains the LICENSE file** (Apache-2.0). The package is packed from `js/`, and the LICENSE at the repository's root never made it in.
+
 ## Python v1.2.0 (unreleased)
 
 **Objects of other CAD kernels**

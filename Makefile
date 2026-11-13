@@ -85,6 +85,9 @@ wheel:
 tarball:
 	@echo "=> Packing the JavaScript half"
 	@mkdir -p dist
+	@# The npm package's root is js/, so the repository's LICENSE goes in as a
+	@# copy (gitignored); yarn pack includes a LICENSE without it being in `files`.
+	@cp LICENSE js/LICENSE
 	@cd js && yarn pack --filename ../dist/ocp-viewer-core-v$(JS_VERSION).tgz
 
 check_dist:

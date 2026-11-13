@@ -7,3 +7,5 @@ dist/
 node_modules/
 *.tgz
 .DS_Store
+# a copy of LICENSE for the npm package, made by `make tarball`
+js/LICENSE
