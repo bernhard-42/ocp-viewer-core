@@ -19,6 +19,11 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 - **`status()` reports the current selection and the last double-click pick** (`selected`, `lastPick`), each with a counter (`selection_seq`, `pick_seq`) that moves with every new one. A new model clears the last pick. This holds where the viewer runs the core's page: VS Code, the standalone viewer and build123d Studio; Jupyter's widget reports `lastPick` through its own trait.
 
+**Changed settings reach an open viewer**
+
+- **A `settings` message to the page**: a host sends the viewer settings its settings dialog changed, under their Python names (`{type: "settings", config: {pan_speed: 2, cursor_pivot: false}}`), and the page applies them to the open viewer at once. Before, a changed setting waited for the viewer to be reopened, because the viewer's reported state wins over the stored settings once a model is shown. Only the settings the viewer reports in its status are applied, since only their old values win; the others (`reset_camera`, `ticks`, `deviation`, the default colors, ...) apply with the next model, as before - `reset_camera` applied now would move the camera.
+- **For hosts**: `settingsToConfig(settings)` does the translation, from `RENDERER_NAMES`, `LIVE_SETTINGS` and `VALUE_NAMES`, which are generated from the Python half (`make keys-js`). Send only the settings that changed; sending all of them would undo what the user changed at the viewer's toolbar.
+
 **Restarting the viewer**
 
 - **`dispose()` on the page**: a host can tear the viewer down and build a new one in the same container, e.g. for build123d Studio's "Restart viewer". It frees the WebGL context and removes the viewer's listeners. Dispose the old page before creating the new one.

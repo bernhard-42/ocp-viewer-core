@@ -35,6 +35,7 @@ import { logo } from "./logo.js";
 import { createNotifier } from "./notify.js";
 import { buildDisplayOptions, preset } from "./options.js";
 import { createRenderer } from "./render.js";
+import { settingsToConfig } from "./settings.js";
 import { currentStates, restoreStates } from "./states.js";
 import { VERSION } from "./version.js";
 
@@ -413,6 +414,21 @@ export function createPage({
                 ...splash,
                 config: { ...splash.config, ...(data.config || {}) }
             };
+        }
+
+        if (data.type === "settings") {
+            // A host's changed settings, under the Python names its settings
+            // dialog stores them by. Applied like a `ui` config, so the viewer
+            // changes now and reports the new values - otherwise its old ones
+            // would keep winning over the stored settings at the next show.
+            const translated = settingsToConfig(data.config || {});
+            if (translated.skipped.length > 0) {
+                debugLog(
+                    "settings: not for an open viewer, applied with the next model:",
+                    translated.skipped
+                );
+            }
+            data = { type: "ui", config: translated.config };
         }
 
         if (data.type === "data" && data?.data?.shapes?.parts?.length > 0) {

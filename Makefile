@@ -1,4 +1,4 @@
-.PHONY: clean bump-py bump-js install tests check dist wheel tarball check_dist upload_test upload release create-release
+.PHONY: clean bump-py bump-js install tests keys-js check dist wheel tarball check_dist upload_test upload release create-release
 
 PYCACHE := $(shell find . -name '__pycache__')
 EGGS := $(wildcard *.egg-info)
@@ -51,6 +51,12 @@ install:
 
 tests:
 	pytest -q
+
+# The setting names and values the JavaScript half needs, generated from
+# keys.py and config.py (see ocp_viewer_core/_keys_js.py); tests/test_keys_js.py
+# fails while the file is out of date.
+keys-js:
+	python -m ocp_viewer_core._keys_js > js/src/keys.js
 
 # The whole toolchain. No formatter, on purpose - see the note in pyproject.toml.
 
