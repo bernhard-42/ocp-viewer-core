@@ -115,6 +115,21 @@ def _xyz(direction) -> tuple[float, float, float]:
     return (direction.X(), direction.Y(), direction.Z())
 
 
+def _axis_center(face, axis) -> tuple[float, float, float]:
+    """The center of a cylinder or cone face: its center of mass projected onto `axis`.
+
+    Their surface's `Location()` is the origin of its own coordinate system, on an
+    axis that is infinite - wherever the shape was built from. This is the axis point
+    at the face's middle: for a full face where its center of mass already is, for a
+    partial one (a fillet) its center of curvature, whatever the placement.
+    """
+    origin = get_point(axis.Location())
+    direction = _xyz(axis.Direction())
+    com = center_of_mass(face)
+    t = sum((c - o) * d for c, o, d in zip(com, origin, direction, strict=True))
+    return tuple(o + t * d for o, d in zip(origin, direction, strict=True))
+
+
 def occt_kind(shape) -> tuple[str, str]:
     """What an OCCT shape is, as `BackendProtocol.kind` gives it."""
     shape = downcast(shape)
@@ -174,7 +189,14 @@ def occt_properties(shape) -> ShapeProperties:
 
             elif geom_type == "Hyperbola":
                 props["start"] = get_point(position_at(shape, 0))
-                props["vertex"] = get_point(get_curve(shape).Hyperbola().Location())
+                # A hyperbola's Location() is its center; the vertex is one major
+                # radius from it along the major axis, on the branch an edge is on
+                hyperbola = get_curve(shape).Hyperbola()
+                center = get_point(hyperbola.Location())
+                major = _xyz(hyperbola.XAxis().Direction())
+                props["vertex"] = tuple(
+                    c + hyperbola.MajorRadius() * d for c, d in zip(center, major, strict=True)
+                )
                 props["end"] = get_point(position_at(shape, 1))
 
             elif geom_type == "Parabola":
@@ -209,16 +231,18 @@ def occt_properties(shape) -> ShapeProperties:
 
     elif is_topods_face(shape):
         if geom_type == "Plane":
-            props["center"] = get_point(get_surface(shape).Plane().Location())
+            # Not the plane's Location(), its origin: for a box face a corner. The
+            # center of mass of a planar face lies in it, as get_center has it.
+            props["center"] = center_of_mass(shape)
 
         elif geom_type == "Cylinder":
             cylinder = get_surface(shape).Cylinder()
-            props["center"] = get_point(cylinder.Location())
+            props["center"] = _axis_center(shape, cylinder.Axis())
             props["radius"] = cylinder.Radius()
 
         elif geom_type == "Cone":
             cone = get_surface(shape).Cone()
-            props["center"] = get_point(cone.Location())
+            props["center"] = _axis_center(shape, cone.Axis())
             props["base_radius"] = cone.RefRadius()
             props["half_angle"] = cone.SemiAngle() / pi * 180
 
@@ -383,10 +407,11 @@ def get_properties(shape):
 
 def get_center(shape):
     """The center of a shape as (x, y, z): of a circle, ellipse, hyperbola or
-    parabola its location, of a cylinder, cone, sphere, torus or revolution
-    surface the location of its axis, else the middle of an edge or the center
-    of mass (of a wire, shell, solid, compsolid or compound by its highest
-    dimension, see ocp_tessellate's center_of_mass)."""
+    parabola its location, of a cylinder or cone face the axis point at its middle
+    (`_axis_center`), of a sphere, torus or revolution surface the location of its
+    axis, else the middle of an edge or the center of mass (of a wire, shell,
+    solid, compsolid or compound by its highest dimension, see ocp_tessellate's
+    center_of_mass)."""
     shape_type = get_shape_type(shape)
     geom_type = get_geom_type(shape)
 
@@ -415,12 +440,10 @@ def get_center(shape):
 
     elif shape_type == "Face":
         if geom_type == "Cylinder":
-            cylinder = get_surface(shape).Cylinder()
-            center = cylinder.Location()
+            center = _axis_center(shape, get_surface(shape).Cylinder().Axis())
 
         elif geom_type == "Cone":
-            cone = get_surface(shape).Cone()
-            center = cone.Location()
+            center = _axis_center(shape, get_surface(shape).Cone().Axis())
 
         elif geom_type == "Sphere":
             sphere = get_surface(shape).Sphere()

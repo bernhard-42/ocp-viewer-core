@@ -54,6 +54,12 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 - **Objects `show` cannot draw are named**: an object nothing can draw - e.g. an object of another kernel whose plugin is not installed - is left out, passed directly or inside a list, and the others are drawn; ocp-tessellate 3.7 names each such type once per show, e.g. `show: skipped smlibpy.shapes.Part (no kernel plugin installed?)`. Builtin types such as `None` stay silent, and `show_all` names none of the variables in a scope it leaves out.
 - **A `show` with nothing it can draw says so**: when nothing is left to draw, `show` prints `show: No CAD objects to show`, as a `show()` without objects does, and sends nothing, so the viewer keeps what it shows.
 
+**Fixes**
+
+- **The center of a cylinder or cone face is the axis point at its middle**: the Properties tool and the Distance tool's center-to-center used the origin of the surface's own coordinate system, a point anywhere on the infinite axis - for a hole made with `Hole`, its top end. They now use the face's center of mass projected onto the axis: for a full face the axis point at mid-height, for a partial one (a fillet) the center of curvature at mid-height, whatever the placement. Spheres and tori keep their center, which their geometry fixes.
+- **The center of a planar face is its center of mass** in the Properties tool, as in the Distance tool. It showed the origin of the face's plane, for a box's face one of its corners.
+- **The vertex of a hyperbola is its vertex**: the Properties tool showed the hyperbola's center under "vertex". It now shows the point one major radius from the center along the major axis, on the branch the edge is on.
+
 **For future agent tools**
 
 - **Private methods** `Viewer._agent_highlight`, `_agent_select`, `_agent_clear_selection` and `_agent_capture`, not meant for users: they send the agent's marks, selection and captures, so that the agent tools can follow as patch releases. `save_screenshot` is unchanged.
