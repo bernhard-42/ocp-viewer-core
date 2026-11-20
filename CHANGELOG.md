@@ -2,7 +2,7 @@
 
 Since 1.0.2 the Python and JavaScript halves version separately on the patch level and agree on major.minor - see `Development.md`. Entries say which half they belong to.
 
-## JavaScript v1.2.0 (unreleased)
+## JavaScript v1.2.0 (2026-11-20)
 
 **three-cad-viewer 5.2**
 
@@ -36,7 +36,7 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 
 - **The npm package contains the LICENSE file** (Apache-2.0). The package is packed from `js/`, and the LICENSE at the repository's root never made it in.
 
-## Python v1.2.0 (unreleased)
+## Python v1.2.0 (2026-11-20)
 
 **Objects of other CAD kernels**
 
