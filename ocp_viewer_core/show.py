@@ -385,13 +385,18 @@ def align_attrs(attr_list, length, default, tag, explode=True):
         return attr_list
 
 
-def none_filter(d, excludes=None):
+def none_filter(d, excludes=None, keep_none=()):
+    """The entries of `d` that were given: None means "not given" and is dropped.
+
+    `keep_none` names keys whose None is a value of its own and must arrive:
+    `progress=None` is "no progress indicator", not "the default".
+    """
     if excludes is None:
         excludes = []
     return {
         k: v
         for k, v in dict(d).items()
-        if v is not None and not callable(v) and k not in excludes
+        if (v is not None or k in keep_none) and not callable(v) and k not in excludes
     }
 
 
@@ -1107,7 +1112,7 @@ class Viewer(Generic[H]):
         """
 
         self.config.validate_tool_args(explode, analysis_tool)
-        return self._show(*cad_objs, **none_filter(locals(), ["cad_objs", "self"]))
+        return self._show(*cad_objs, **none_filter(locals(), ["cad_objs", "self"], keep_none=["progress"]))
 
     def _show(self, *cad_objs, **kwargs) -> H | None:
         """Send one model, and forget what this show read.
@@ -1140,7 +1145,9 @@ class Viewer(Generic[H]):
         materials = kwargs.get("materials")
         modes = kwargs.get("modes")
         default_edgecolor = kwargs.get("default_edgecolor")
-        progress = ShowProgress(kwargs.get("progress", "+-*c"))
+        progress = kwargs.get("progress", "+-*c")
+        # None is "no progress indicator" (see the docstring of show)
+        progress = ShowProgress("" if progress is None else progress)
         _force_in_debug = kwargs.get("_force_in_debug")
 
         if (
@@ -1188,6 +1195,9 @@ class Viewer(Generic[H]):
 
         names = align_attrs(names, len(cad_objs), None, "names")
 
+        if isinstance(modes, Render):
+            # One mode for every object, as the docstring and the render_edges deprecation offer
+            modes = [modes] * len(cad_objs)
         modes = align_attrs(modes, len(cad_objs), None, "modes")
         modes = [mode if mode is None else _MODE_STATES[mode] for mode in modes]
 
@@ -1559,7 +1569,7 @@ class Viewer(Generic[H]):
             timeit:                  Show timing information from level 0-3 (default=False)
         """
         self.config.validate_tool_args(explode, analysis_tool)
-        return self._show_object(obj, **none_filter(locals(), ["obj", "self"]))
+        return self._show_object(obj, **none_filter(locals(), ["obj", "self"], keep_none=["progress"]))
 
     def remove_object(
         self, name, call_show=False, port=None, progress="-+c"
@@ -1956,7 +1966,7 @@ class Viewer(Generic[H]):
             timeit:                  Show timing information from level 0-3 (default=False)
         """
         self.config.validate_tool_args(explode, analysis_tool)
-        kwargs = none_filter(locals(), ["self"])
+        kwargs = none_filter(locals(), ["self"], keep_none=["progress"])
         # Use per-object modes stored in OBJECTS
         stored_modes = self.objects["modes"]
         if any(m is not None for m in stored_modes):

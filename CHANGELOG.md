@@ -59,6 +59,8 @@ Since 1.0.2 the Python and JavaScript halves version separately on the patch lev
 - **The center of a cylinder or cone face is the axis point at its middle**: the Properties tool and the Distance tool's center-to-center used the origin of the surface's own coordinate system, a point anywhere on the infinite axis - for a hole made with `Hole`, its top end. They now use the face's center of mass projected onto the axis: for a full face the axis point at mid-height, for a partial one (a fillet) the center of curvature at mid-height, whatever the placement. Spheres and tori keep their center, which their geometry fixes.
 - **The center of a planar face is its center of mass** in the Properties tool, as in the Distance tool. It showed the origin of the face's plane, for a box's face one of its corners.
 - **The vertex of a hyperbola is its vertex**: the Properties tool showed the hyperbola's center under "vertex". It now shows the point one major radius from the center along the major axis, on the branch the edge is on.
+- **`progress=None` shows no progress**, as documented, in `show`, `show_object`, `show_objects` and `show_all`. The None was dropped with the keywords not given, so the default progress was printed; only `progress=""` was silent.
+- **`modes=Render.FACES`** (one mode, not a list) applies to every object, as the docstring's advice for `render_edges` says. It failed with "object of type 'Render' has no len()".
 
 **For future agent tools**
 
